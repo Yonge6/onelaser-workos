@@ -6,8 +6,16 @@
   <meta name="theme-color" content="#1d4ed8">
   <meta name="description" content="OneLaser 工作与成果管理交互原型。通过任务、OKR和有证据的成果验收，让计划与真实产出连接。">
   <title>OneLaser · 工作与成果</title>
-  <link rel="stylesheet" href="./styles.css">
-  <script src="./app.js" defer></script>
+  <script>
+    (() => { try {
+      const saved = localStorage.getItem('onelaser-workos-theme');
+      document.documentElement.dataset.theme = saved === 'light' || saved === 'dark' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.lang = localStorage.getItem('onelaser-workos-language') === 'en' ? 'en' : 'zh-CN';
+    } catch { document.documentElement.dataset.theme = 'light'; } })();
+  </script>
+  <link rel="stylesheet" href="./styles.css?v=20261027-bilingual-theme-1">
+  <script src="./i18n.js?v=20261027-bilingual-theme-1" defer></script>
+  <script src="./app.js?v=20261027-bilingual-theme-1" defer></script>
 </head>
 <body>
   <div id="app"></div>
