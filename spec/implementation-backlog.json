@@ -1,0 +1,30 @@
+{
+  "status": "proposed_production_backlog_not_implemented",
+  "deployment": "Enterprise-controlled Node.js service and PostgreSQL; the hosted static prototype is for review only.",
+  "milestones": [
+    {
+      "id": "M0",
+      "name": "Confirm pilot and data contracts",
+      "deliverables": ["Pilot members and role matrix", "Existing tables export and source-ID mapping", "Role-specific rubrics with sample evidence", "Bot product identity and API capabilities verified"],
+      "acceptance": ["Business owner approves task acceptance standards and working-time calendars", "Administrator confirms app scope and test organization"]
+    },
+    {
+      "id": "M1",
+      "name": "Accounts departments tasks and OKRs",
+      "deliverables": ["DingTalk OAuth callback and server-side identity binding", "Department scope enforcement and access revocation", "Task state machine and append-only plan changes", "Metric-based KR updates with evidence", "Versioned attachment storage"],
+      "acceptance": ["Employee cannot enumerate other employee records by changing request IDs", "Department manager cannot access another department or HR compensation", "Submission status cannot bypass reviewer approval", "Completing a task does not fabricate a numeric KR update"]
+    },
+    {
+      "id": "M2",
+      "name": "Evidence review and notifications",
+      "deliverables": ["Bounded document extraction", "AI provider adapter and schema validation", "Evidence citation verification", "Version-aware reviewer approval and employee response", "Notification outbox and daily digest"],
+      "acceptance": ["Inaccessible evidence yields unknown and a request for material", "Prompt injection inside evidence cannot change permissions or dispatch tools", "Duplicate events produce one review and one notification", "An approval against an obsolete submission is rejected", "Off-hours and leave are excluded from response timing"]
+    },
+    {
+      "id": "M3",
+      "name": "Migration recovery and pilot validation",
+      "deliverables": ["CSV dry-run and source count reconciliation", "Audit export", "Database and attachment recovery drill", "Human-versus-AI calibration results", "Two-week pilot report"],
+      "acceptance": ["All imported source IDs reconcile without duplicates", "Audit identifies reviewer version evidence and reason for each official score", "Backup restores tested organization and files", "No autonomous employment or pay decision is executed", "Business owner confirms rollout after evidence and false-positive review"]
+    }
+  ]
+}

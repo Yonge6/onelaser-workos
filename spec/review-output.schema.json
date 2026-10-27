@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task evidence review proposal — requires human approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "submission_version", "rubric_version", "result", "summary", "criteria", "missing_evidence", "uncertainties", "human_review_required"],
+  "properties": {
+    "task_id": {"type": "string", "minLength": 1},
+    "submission_version": {"type": "integer", "minimum": 1},
+    "rubric_version": {"type": "string", "minLength": 1},
+    "result": {"enum": ["ready_for_human_review", "needs_more_evidence", "unable_to_assess"]},
+    "summary": {"type": "string", "maxLength": 2000},
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion_id", "finding", "proposed_score", "evidence_refs", "reason"],
+        "properties": {
+          "criterion_id": {"type": "string", "minLength": 1},
+          "finding": {"enum": ["supported", "partially_supported", "contradicted", "insufficient_evidence"]},
+          "proposed_score": {"type": ["number", "null"], "minimum": 0, "maximum": 100},
+          "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "reason": {"type": "string", "maxLength": 2000}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"finding": {"const": "insufficient_evidence"}}},
+            "then": {"properties": {"proposed_score": {"type": "null"}}}
+          },
+          {
+            "if": {"properties": {"finding": {"enum": ["supported", "partially_supported", "contradicted"]}}},
+            "then": {"properties": {"evidence_refs": {"minItems": 1}}}
+          }
+        ]
+      }
+    },
+    "missing_evidence": {"type": "array", "items": {"type": "string", "maxLength": 1000}},
+    "uncertainties": {"type": "array", "items": {"type": "string", "maxLength": 1000}},
+    "human_review_required": {"const": true}
+  }
+}

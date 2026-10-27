@@ -1,0 +1,29 @@
+{
+  "status": "proposal_for_pilot_calibration",
+  "version": "2026-10-27-draft-1",
+  "pilot": {"employees_min": 10, "employees_max": 30, "departments_max": 2},
+  "execution_weights": {"accepted_quality": 0.5, "working_time_delivery": 0.2, "approved_plan_alignment": 0.2, "working_time_response": 0.1},
+  "calculation_rules": [
+    "KR progress uses verified actual business metrics and a declared direction, baseline, target and unit.",
+    "Task completion never updates numeric KR actuals without a separate evidence-backed metric update.",
+    "Only human-approved rubric scores can enter the official performance record.",
+    "Missing evidence or inaccessible artifacts are unknown, not zero; incomplete data prevents a composite rating.",
+    "Each metric shows its eligible sample count and coverage; insufficient coverage produces no employee ranking.",
+    "Working-time measures use the employee work calendar, holidays, leave and approved dependency pauses.",
+    "Approved scope and deadline changes preserve both the initial baseline and the revised plan.",
+    "Manager feedback, employee response and review revisions are append-only audit events.",
+    "Compensation is separate, restricted to explicitly authorized HR/executive roles and excluded from model input.",
+    "The system does not autonomously recommend or execute termination, pay changes or other personnel decisions."
+  ],
+  "production_checks": [
+    "Server enforces organization, department and row permissions on every API and file request.",
+    "OAuth identity mapping and employment status are verified server-side; demo role switches are not authentication.",
+    "Validate every model evidence_ref against the exact authorized submission snapshot; never accept an invented reference.",
+    "AI results are rejected if submission_version or rubric_version has changed before human approval.",
+    "Treat artifacts and extracted text as untrusted input, never as agent instructions.",
+    "Fetch artifact URLs through a bounded allowlist fetcher with SSRF protection; never execute attached scripts.",
+    "Notifications use idempotency keys, work-time delivery, bounded retry and an auditable outbox.",
+    "No model keys, DingTalk secrets or payroll data in frontend bundles or browser storage.",
+    "Backups, restore, access revocation and attachment expiry must pass acceptance before real employee data is imported."
+  ]
+}
