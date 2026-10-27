@@ -30,10 +30,12 @@ Live mode checks `/capabilities` and `/me`; an unauthenticated visitor sees only
 
 The live interface supports task creation and filtering, objective and KR creation, verified measurements, versioned submissions, designated human review, current-version Grok assessment, reminder previews and explicit manager sending. AI findings show evidence references, missing material and uncertainties. DingTalk queue acceptance is described as submitted to the sending queue, never as delivered. Actual availability depends on server configuration and real responses.
 
+`capabilities.aiReviewMode` selects the synchronous `api` or asynchronous `bot` path. Bot dispatch, pending pickup, processing, completion, failure, uncertain dispatch, expiry and replacement are distinct states. Dispatch acceptance never means assessment completion. Only findings for the current submission appear as its assessment; older jobs are labelled separately. Status reads back off at 2 / 4 / 8 / 15 seconds and stop after about two minutes with manual refresh available. Closing details, switching tasks or losing the session cancels reads. Failed, expired or uncertain jobs require explicit retry, never an automatic write replay. An uncertain dispatch additionally requires acknowledging that the original run may continue and a retry may consume Bot allowance again. Existing Bot allowance, model API billing and availability depend on the respective accounts; no free or unlimited usage is promised. Managers still inspect and accept actual deliverables.
+
 `dist/preferences.js` restores language and theme before styles load, without requiring CSP `unsafe-inline` for scripts. `dist/api-client.js` handles cookies, CSRF, language and structured errors; `dist/live-app.js` renders the company workspace. Run the client and mode-isolation tests with:
 
 ```sh
-node --test test/api-client.test.mjs
+node --test test/*.test.mjs
 ```
 
 These tests include mocked HTTP responses; they do not establish that real DingTalk authentication, model assessment or notification delivery has passed production acceptance.

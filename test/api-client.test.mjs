@@ -59,6 +59,16 @@ test('network failure reports an unconfirmed save rather than success',async()=>
   const {api}=client(async()=>{throw Object.assign(new Error('aborted'),{name:'AbortError'});});
   await assert.rejects(api.get('/tasks'),error=>error.code==='TIMEOUT'&&error.message.includes('not been confirmed'));
 });
+test('a cancelled drawer read aborts the fetch and is distinct from a timeout',async()=>{
+  const controller=new AbortController();let fetchSignal;
+  const {api}=client(async(url,options)=>new Promise((resolve,reject)=>{fetchSignal=options.signal;options.signal.addEventListener('abort',()=>reject(Object.assign(new Error('aborted'),{name:'AbortError'})),{once:true});}));
+  const request=api.get('/tasks/task-1',{signal:controller.signal});controller.abort();
+  await assert.rejects(request,error=>error.code==='CANCELLED');assert.equal(fetchSignal.aborted,true);
+});
+test('an already cancelled read makes no HTTP request',async()=>{
+  let calls=0;const {api}=client(async()=>{calls++;return response(200,{});});const controller=new AbortController();controller.abort();
+  await assert.rejects(api.get('/tasks',{signal:controller.signal}),error=>error.code==='CANCELLED');assert.equal(calls,0);
+});
 
 function documentStub() {
   const elements=new Map(['app','overlay-root','toast'].map(id=>[id,{innerHTML:'',textContent:'',classList:{add(){},remove(){}}}]));
