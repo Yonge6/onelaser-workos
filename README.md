@@ -55,3 +55,7 @@ python3 -m http.server 8867 --bind 127.0.0.1 --directory dist
 ## GitHub Pages 发布
 
 推送 `main` 分支的网页修改后，GitHub Actions 自动部署 `dist/`。也可以在 Actions 中手动运行 Deploy GitHub Pages。页面公开可访问，仅用于虚构数据的产品流程演示；真实员工系统需要独立后端、身份认证和服务端权限。
+
+## 后台 API
+
+[后台 API 源码](https://github.com/Yonge6/onelaser-workos-api)单独维护。当前 GitHub Pages 页面仍使用浏览器本地演示数据，尚未连接后台；仓库中提供任务、OKR、成果提交和人工验收的后台开发版本，钉钉及模型接入以各自验收为准。
