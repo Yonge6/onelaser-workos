@@ -26,6 +26,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Check live client and demo isolation
+        run: node --test test/api-client.test.mjs
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

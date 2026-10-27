@@ -1,6 +1,7 @@
 'use strict';
 
 (() => {
+  if (window.WORKOS_CONFIG?.mode === 'live') return;
   const KEY = 'onelaser-workos-demo-v4';
   const TODAY = '2026-10-27';
   const NOW = '2026-10-27T16:00:00+08:00';

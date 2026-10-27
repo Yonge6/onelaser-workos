@@ -95,3 +95,8 @@ html[data-theme=dark] .topbar-right .env{background:#263b61;border-color:#3b5278
 
 /* Keep workspace names on one readable line. */
 .workspace-switch>span:nth-child(2){min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}.workspace-switch{gap:7px;padding-left:9px;padding-right:9px;font-size:12px}
+
+/* Server-backed company workspace */
+.live-login{max-width:850px}.live-login-panel{max-width:580px;margin-top:30px}.live-login-panel .btn{margin:0 8px 8px 0}.live-user-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.live-space-top{margin-top:20px}.live-space-bottom{margin-bottom:16px}.live-error{margin-bottom:20px}.live-objective-mini{padding:10px 0 18px}.live-objective-mini h3{font-size:14px;line-height:1.7}.live-objective-mini+.live-objective-mini{border-top:1px solid var(--border);padding-top:18px}.live-task-table{min-width:840px}.live-ai-criterion{padding:10px 0;border-top:1px solid var(--border);margin-top:10px}.live-ai-criterion small{font-size:11px;color:var(--muted)}.live-mode-strip>span:last-child{flex:0 1 auto}.live-login .form-error{margin-top:14px}.live-login-panel h2{font-size:19px}.live-login .gateway-intro{max-width:690px}
+@media(max-width:670px){.live-login-panel .panel-body{padding:20px}.live-mode-strip>span:last-child{display:none}.live-task-table{min-width:840px}}
+.live-evidence-quote{margin:8px 0;padding:8px 12px;border-left:2px solid var(--blue);font-size:12px;color:var(--ink);white-space:pre-wrap}
