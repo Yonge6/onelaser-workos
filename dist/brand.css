@@ -78,3 +78,13 @@ html[lang=en] .gateway-main h1,html[lang=en] .page-heading h1{font-size:32px}
   html:root .gateway-header>.display-controls{margin-right:0}.live-login-panel .panel-body{padding:20px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.entry-card:hover{transform:none}}
+
+/* Executive overview shares the website typography and four-pixel spacing grid. */
+.exec-asof{text-align:right;max-width:320px}.exec-asof p{margin-top:12px}
+.exec-note{font-size:13px;color:var(--muted);line-height:1.6;margin:16px 0 24px}
+.exec-panel{margin-bottom:24px}.exec-table{min-width:820px}.exec-table td{white-space:normal}
+.exec-progress{display:flex;align-items:center;gap:12px;margin-top:12px}.exec-progress .progress{flex:1;min-width:72px}.exec-progress strong{font-size:14px}
+.exec-risk{display:flex;justify-content:space-between;gap:16px;padding:20px 24px;border-bottom:1px solid var(--border)}
+.exec-risk h3{font-size:14px;line-height:1.5;margin:0 0 8px}.exec-risk-labels{display:flex;flex-wrap:wrap;gap:8px;align-content:start;justify-content:end;min-width:88px}
+.exec-lower{align-items:start}.exec-entry{margin:24px 0;display:flex;justify-content:center}
+@media(max-width:640px){.exec-asof{text-align:left}.exec-risk{padding:16px;flex-direction:column}.exec-risk-labels{justify-content:start}.exec-lower{grid-template-columns:1fr}}

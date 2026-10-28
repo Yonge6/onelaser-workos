@@ -4,6 +4,7 @@
  * input values, permission keys and data-* attributes are never translated. */
 (() => {
   const dictionary = {
+    '虚构数据 / 本机保存 · 钉钉和 Grok 均未接入 · 仅展示全公司只读总览':'Fictional data / browser-local · DingTalk and Grok are not connected · Company-wide read-only overview','老板看板':'Executive overview','进入老板看板':'Open executive overview','公司负责人':'Company owner','管理层':'Leadership','老板看板（演示）':'Executive overview (demo)','仅展示全公司只读总览':'Company-wide read-only overview',
     '工作与成果 / Work OS':'Work OS · Work & Outcomes','工作与成果':'Work & Outcomes',
     '演示身份 · 可切换体验':'Demo identity · switch perspectives','选择演示身份':'Choose demo identity','演示身份':'Demo identity','切换演示身份':'Switch demo identity','演示身份 · 非真实登录':'Demo identity · no authentication',
     '每一份工作，':'Every contribution,','都连接':'connected to ','真实的成果。':'real outcomes.','从今天的任务，到季度的目标。':'From today’s tasks to this quarter’s goals.','让计划有方向，让交付有依据，让每一次评价可以被看见、被复核。':'Give plans direction, deliveries evidence, and every assessment a clear review trail.',
