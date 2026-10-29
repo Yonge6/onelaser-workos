@@ -51,13 +51,13 @@ test('imported O and KR labels sort naturally within owner/period while non-impo
 });
 
 const flush=async()=>{for(let i=0;i<3;i++)await new Promise(setImmediate);};
-async function harness({kr={...quantified,baseline:null,target:null,actual:null,direction:null,unit:null,progress:null,importSource:source},language='en'}={}){
+async function harness({kr={...quantified,baseline:null,target:null,actual:null,direction:null,unit:null,progress:null,importSource:source},language='en',extraObjectives=[],actorId='manager1'}={}){
  const calls=[],listeners=new Map(),elements=new Map(['app','overlay-root','toast'].map(id=>[id,{innerHTML:'',textContent:'',classList:{add(){},remove(){}}}]));
  const objective={id:'o1',title:'Original objective',owner_id:'owner1',department_id:'company',level:'personal',planning:{period:'2026-10',weight:50,type:'mandatory',scoringDueDate:'2026-08-27'},importSource:{...source,itemLabel:'O1'}};
  kr={...kr,department_id:'company',owner_id:'owner1'};
  const document={documentElement:{dataset:{theme:'light'}},body:{style:{}},title:'',activeElement:null,contains:()=>false,querySelector:()=>null,querySelectorAll:()=>[],getElementById:id=>elements.get(id),addEventListener:(type,handler)=>listeners.set(type,handler)};
  class Client{
-  async get(path){calls.push({method:'GET',path});if(path==='/capabilities')return {};if(path==='/me')return {id:'manager1',display_name:'Manager',department_id:'company',role:'manager'};if(path==='/objectives')return {items:[objective]};if(path==='/key-results')return {items:[kr]};if(path==='/directory')return {items:[]};if(path==='/key-results/kr1/appraisal')return {version:1,self:null,manager:null,history:[],legacySource:legacy};if(path==='/objectives/o1/source')return legacy;return {items:[]};}
+  async get(path){calls.push({method:'GET',path});if(path==='/capabilities')return {};if(path==='/me')return {id:actorId,display_name:'Manager',department_id:'company',role:'manager'};if(path==='/objectives')return {items:[objective,...extraObjectives]};if(path==='/key-results')return {items:[kr]};if(path==='/directory')return {items:[]};if(path==='/key-results/kr1/appraisal')return {version:1,self:null,manager:null,history:[],legacySource:legacy};if(path==='/objectives/o1/source')return legacy;return {items:[]};}
   async post(path,body){calls.push({method:'POST',path,body});return {};}
  }
  const window={WORKOS_CONFIG:{mode:'live',apiBase:'/api'},WorkOSApi:{Client},WorkI18n:{lang:language,set(value){this.lang=value;}},location:{origin:'https://work.example'}};
@@ -67,7 +67,7 @@ async function harness({kr={...quantified,baseline:null,target:null,actual:null,
  const click=async dataset=>{listeners.get('click')({target:{closest:()=>({dataset}),matches:()=>false}});await flush();};
  const submit=async values=>{const error={textContent:''};await listeners.get('submit')({target:{id:'live-measure',dataset:{krId:'kr1'},values,querySelector:()=>error},preventDefault(){}});await flush();return error.textContent;};
  await click({livePage:'okr'});
- return {calls,click,submit,html:()=>elements.get('app').innerHTML,drawer:()=>elements.get('overlay-root').innerHTML,toast:()=>elements.get('toast').textContent};
+ return {calls,click,submit,change:async value=>{listeners.get('change')({target:{id:'live-okr-owner',value}});await flush();},html:()=>elements.get('app').innerHTML,drawer:()=>elements.get('overlay-root').innerHTML,toast:()=>elements.get('toast').textContent};
 }
 
 test('live imported unquantified KR has source labels and history but no measurement action or fabricated progress',async()=>{
@@ -90,4 +90,13 @@ test('identical title/description is shown once and unknown bonus inclusion rema
  const planning={period:'2026-10',weight:50,type:'bonus',bonusIncluded:null,description:'Original objective'};
  const view=O.plan(planning,'en','Original objective');assert.doesNotMatch(view,/Original objective/);assert.match(view,/Include bonus in scoring<\/dt><dd>—/);assert.doesNotMatch(view,/<dd>No<\/dd>/);
  const result=O.summary(planning,[quantified],{});assert.equal(result.included,false);assert.equal(result.contribution,null);assert.match(O.summaryHtml(result,'en'),/inclusion is unconfirmed/);
+});
+
+test('OKRs default to the current employee and all-employee view keeps separate named groups',async()=>{
+ const extra={id:'o2',owner_id:'manager1',title:'My objective',department_id:'company',level:'personal'};
+ const h=await harness({extraObjectives:[extra]});
+ assert.match(h.html(),/My objective/);assert.doesNotMatch(h.html(),/<h3>Original objective/);
+ await h.change('owner1');assert.match(h.html(),/<h3>Original objective/);assert.doesNotMatch(h.html(),/<h3>My objective/);
+ await h.change('*');assert.match(h.html(),/data-okr-owner="manager1"/);assert.match(h.html(),/data-okr-owner="owner1"/);
+ await h.click({livePage:'overview'});await h.click({livePage:'okr'});assert.match(h.html(),/value="\*" selected/);
 });

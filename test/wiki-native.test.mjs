@@ -43,8 +43,10 @@ test('native overview preserves 236 guides, all eight families and 52 download a
   assert.equal(view.querySelectorAll('.wiki-family-card').length,8);
   assert.match(view.querySelector('.wiki-stats').textContent,/236 guides.*8 families.*52 download guides/);
   assert.equal(view.querySelectorAll('.wiki-family-image img').length,4);
+  assert.equal(view.querySelector('.wiki-contact-button').getAttribute('href'),'https://www.1laser.com/pages/contact-us');
+  assert.doesNotMatch(view.textContent,/Original source|原站源码/);
   assert.equal(view.querySelectorAll('iframe,script,header,footer,h1').length,0);
-  assert.equal(view.querySelectorAll('.wiki-help-links a').length,4);
+  assert.equal(view.querySelectorAll('.wiki-help-links a').length,3);
   assert.match(h.ui.renderNav(),/#knowledge\/archive/);
   assert.deepEqual(h.requests,['/wiki/data/library.json','/wiki/data/search-index.json']);
   await h.navigate('#knowledge/downloads');assert.equal(h.mount.querySelectorAll('.wiki-guide-card').length,52);
@@ -66,6 +68,7 @@ test('route and query survive language changes and article back links return to 
   assert.match(destination,/^#knowledge\/article\/en-1/);
   await h.navigate(destination);
   assert.equal(h.mount.querySelector('.wiki-back').getAttribute('href'),start);
+  assert.equal(h.mount.querySelector('.wiki-source-link'),null);
   const body=h.mount.querySelector('.wiki-article-body').innerHTML;
   h.ui.configure({language:'zh'});h.render();
   assert.equal(h.window.location.hash,destination);
@@ -195,4 +198,16 @@ test('complete original package retains every article, source link, image, table
     for(let i=0;i<before.length;i++)if(before[i].getAttribute('href').startsWith('/#/article/')){internalCount++;assert.match(after[i].getAttribute('href'),/^#knowledge\/article\/en-\d+/);}
   }
   assert.equal(imageCount,2181);assert.equal(tableCount,314);assert.equal(headingCount,2691);assert.equal(internalCount,486);
+});
+
+test('explicit public preloading deduplicates requests and makes repeated navigation immediate',async()=>{
+ const h=harness({active:false,hash:'#tasks'});
+ await Promise.all([h.ui.preload(),h.ui.preload()]);
+ assert.equal(h.requests.length,2);assert.equal(h.changes,0);
+ h.ui.configure({active:true});h.window.location.hash='#knowledge/';
+ assert.doesNotMatch(h.ui.render(),/Loading documentation/);
+ h.ui.configure({active:false});h.ui.configure({active:true});
+ assert.doesNotMatch(h.ui.render(),/Loading documentation/);
+ assert.equal(h.requests.length,2);
+ h.ui.reset();await h.ui.preload();assert.equal(h.requests.length,4);
 });

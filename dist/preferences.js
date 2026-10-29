@@ -1,7 +1,17 @@
-'use strict';
-    (() => { try {
-      const saved = localStorage.getItem('onelaser-workos-theme');
-      document.documentElement.dataset.theme = saved === 'light' || saved === 'dark' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.lang = localStorage.getItem('onelaser-workos-language') === 'en' ? 'en' : 'zh-CN';
-    } catch { document.documentElement.dataset.theme = 'light'; } })();
 
+'use strict';
+(() => {
+  let theme='light',language='en';
+  try {
+    // Apply the requested company defaults once; subsequent manual choices persist.
+    if(localStorage.getItem('onelaser-workos-defaults')!=='en-light-20261029'){
+      localStorage.setItem('onelaser-workos-theme','light');
+      localStorage.setItem('onelaser-workos-language','en');
+      localStorage.setItem('onelaser-workos-defaults','en-light-20261029');
+    }
+    theme=localStorage.getItem('onelaser-workos-theme')==='dark'?'dark':'light';
+    language=localStorage.getItem('onelaser-workos-language')==='zh'?'zh-CN':'en';
+  } catch {}
+  document.documentElement.dataset.theme=theme;
+  document.documentElement.lang=language;
+})();

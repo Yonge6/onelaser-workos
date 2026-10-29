@@ -45,8 +45,8 @@
     t111:['发布检查脚本整理','Package reusable release-check scripts','把重复发布检查整理成可重用的脚本和操作说明。','Turn repetitive release checks into reusable scripts and operating instructions.',['脚本覆盖约定的检查清单','Cover the agreed release checklist','异常能返回清楚的错误信息','Return clear error messages when checks fail','其他同事按文档能复现','Ensure another colleague can reproduce the steps']],
     t112:['确认新版页面体验验收清单','Confirm the new page UX acceptance checklist','统一产品与设计的验收标准，减少验收阶段的返工。','Align Product and Design acceptance criteria to reduce review-stage rework.',['清单覆盖核心页面和流程','Cover core pages and flows','每一项有可观察的通过条件','Define observable pass criteria for each item','负责人确认清单版本','Have the owner confirm the checklist version']]
   };
-  let lang='zh';
-  try { if(localStorage.getItem('onelaser-workos-language')==='en')lang='en'; } catch {}
+  let lang='en';
+  try { if(localStorage.getItem('onelaser-workos-language')==='zh')lang='zh'; } catch {}
   const protectedValues=new Map();let serial=0;
   function protect(escaped){const key=`__OS_VALUE_${serial++}__`;protectedValues.set(key,escaped);return key;}
   function seed(task,field,index){if(lang!=='en')return field==='criteria'?task.criteria[index]:task[field];const a=taskSeeds[task.id];if(!a)return field==='criteria'?task.criteria[index]:task[field];if(field==='title')return task.title===a[0]?a[1]:task.title;if(field==='description')return task.description===a[2]?a[3]:task.description;const pairs=a[4];const original=task.criteria[index];const at=pairs.indexOf(original);return at>=0&&at%2===0?pairs[at+1]:original;}

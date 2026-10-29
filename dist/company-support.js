@@ -1,14 +1,14 @@
 'use strict';
 window.CompanySupport = (() => {
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let api,actor,language='zh',changed,showModal,cache={},tab='tickets',ticketQuery='',query='',viewContext='',openGeneration=0;
+  let api,actor,language='zh',changed,showModal,cache={},tab='tickets',ticketQuery='',query='',viewContext='',openGeneration=0,wikiPreloaded=false;
   const tr=(zh,en)=>language==='en'?en:zh;
   const date=v=>v?new Date(v).toLocaleString(language==='en'?'en-GB':'zh-CN'):'—';
   const safe=v=>{try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}};
   const source=s=>safe(s.url)?`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title||s.url)}</a> <small>${esc(s.version||'')}</small>`:esc(s.title||'');
-  function configure(options){const nextContext=[options.actor?.id,options.view,window.location?.hash||''].join('|');if(nextContext!==viewContext){viewContext=nextContext;openGeneration++;}({api,actor,changed,showModal}=options);language=options.language;window.WorkOSWiki?.configure({language,changed,active:!!actor&&options.active===true&&!isArchive()});}
+  function configure(options){const nextContext=[options.actor?.id,options.view,window.location?.hash||''].join('|');if(nextContext!==viewContext){viewContext=nextContext;openGeneration++;}({api,actor,changed,showModal}=options);language=options.language;window.WorkOSWiki?.configure({language,changed,active:!!actor&&options.active===true&&!isArchive()});if(actor&&!wikiPreloaded){wikiPreloaded=true;void window.WorkOSWiki?.preload?.();}}
   const isArchive=()=>/^#knowledge\/archive(?:[?]|$)/.test(window.location?.hash||'');
-  function reset(){openGeneration++;viewContext='';cache={};actor=null;query='';ticketQuery='';tab='tickets';window.WorkOSWiki?.reset();}
+  function reset(){openGeneration++;viewContext='';cache={};actor=null;query='';ticketQuery='';tab='tickets';wikiPreloaded=false;window.WorkOSWiki?.reset();}
   async function refresh(){
     const identity=actor?.id;if(!identity)return;cache={};
     const list=await api.get('/support/library');if(actor?.id!==identity)return;cache.library=list;
