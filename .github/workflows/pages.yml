@@ -6,6 +6,8 @@ on:
     paths:
       - 'dist/**'
       - 'test/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -30,6 +32,9 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
+          cache: npm
+      - name: Install DOM test dependency
+        run: npm ci --ignore-scripts
       - name: Check live client and demo isolation
         run: node --test test/*.test.mjs
       - name: Configure Pages

@@ -19,6 +19,19 @@
   const statusLabel = status => { const item = labels[status]; return item ? tr(item[0], item[1]) : status; };
   const badge = status => `<span class="badge ${labels[status]?.[2] || ''}"><span class="dot"></span>${esc(statusLabel(status))}</span>`;
   const navs = [['executive','home','老板看板','Executive overview'],['overview','home','工作台','Overview'],['tasks','task','任务中心','Task hub'],['okr','target','OKR 目标','OKRs'],['reviews','review','成果验收','Deliverable review'],['performance','team','绩效参考','Performance insights'],['support','review','客服工作台','Support workspace'],['knowledge','file','知识中心 / Wiki','Knowledge center / Wiki'],['integrations','plug','集成与通知','Integrations & notifications']];
+  function routePage() {
+    const candidate=(window.location.hash||'').replace(/^#/, '').split(/[/?]/)[0];
+    return navs.some(item=>item[0]===candidate)?candidate:null;
+  }
+  state.page=routePage()||state.page;
+  function applyRoute() {
+    const page=routePage()||(state.actor?.executiveAccess?'executive':'overview');
+    state.page=page==='executive'&&!state.actor?.executiveAccess?'overview':page;
+    if(state.page==='support'&&state.actor&&!state.actor.supportAccess?.read)state.page='overview';
+    state.menu=false;closeOverlay();render();
+    if(state.page==='knowledge')window.WorkOSWiki?.ensureLoaded();
+  }
+  window.addEventListener?.('hashchange',applyRoute);
   const levelLabel = value => ({company:tr('公司目标','Company objective'),department:tr('部门目标','Department objective'),personal:tr('个人目标','Individual objective')}[value] || value);
   const configured = value => value === true || ['configured','ready','enabled','connected'].includes(value);
   const botMode = () => state.capabilities.aiReviewMode === 'bot';
@@ -30,8 +43,8 @@
   const empty = text => `<div class="empty">${icon('file')}<p>${text}</p></div>`;
   function brand() { return `<div class="brand official-brand"><img class="brand-wordmark" src="./assets/onelaser-logo-${theme === 'dark' ? 'white' : 'black'}.svg" alt="OneLaser" width="2350" height="535"><small>Work OS</small></div>`; }
   function controls() { return `<div class="display-controls"><div class="language-switch" role="group" aria-label="${tr('界面语言','Interface language')}"><button data-live-lang="zh" lang="zh-CN" aria-label="中文" aria-pressed="${i18n.lang === 'zh'}" class="${i18n.lang === 'zh' ? 'active' : ''}">中</button><span aria-hidden="true">/</span><button data-live-lang="en" lang="en" aria-label="English" aria-pressed="${i18n.lang === 'en'}" class="${i18n.lang === 'en' ? 'active' : ''}">EN</button></div><button type="button" class="theme-toggle" data-live-action="theme" aria-label="${theme === 'dark' ? tr('切换到日间主题','Switch to light theme') : tr('切换到夜间主题','Switch to dark theme')}">${icon(theme === 'dark' ? 'sun' : 'moon')}</button></div>`; }
-  function preserveWikiFrame() {
-    if(state.page!=='knowledge'||!document.querySelector('.company-wiki-frame'))return false;
+  function updateShellChrome() {
+    if(!document.querySelector('.app-shell'))return false;
     document.querySelector('.app-shell').classList.toggle('menu-open',state.menu);
     document.querySelector('.brand-wordmark').setAttribute('src',`./assets/onelaser-logo-${theme==='dark'?'white':'black'}.svg`);
     const toggle=document.querySelector('[data-live-action="theme"]');
@@ -50,7 +63,7 @@
     return `<div class="gateway"><header class="gateway-header">${brand()}${controls()}</header><main class="gateway-main live-login"><div class="gateway-label">WORK WITH CLARITY</div><h1>${tr('工作有方向，<br>成果有依据。','Work with direction.<br>Deliver with evidence.')}</h1><p class="gateway-intro">${tr('使用企业钉钉身份进入任务、OKR、客服与知识工作空间。工作记录保存在服务端，按员工和部门授权访问。','Use your company DingTalk identity to access tasks, OKRs, support and knowledge. Work records are stored on the server and authorized by employee and department.')}</p><div class="live-login-panel panel"><div class="panel-body"><h2>${tr('登录工作空间','Sign in to your workspace')}</h2><p class="fine" style="margin:12px 0 20px">${tr('不需要另设密码，账号状态和组织范围由企业管理员管理。','No separate password is required. Your organization administrator manages account status and access.')}</p>${state.loading ? `<p role="status">${tr('正在连接服务…','Connecting to the service…')}</p>` : `<button class="btn primary" data-live-action="login" ${ready ? '' : 'disabled'}>${tr('使用钉钉登录','Sign in with DingTalk')} ${icon('arrow')}</button>${ready ? '' : `<p class="fine" style="margin-top:15px">${tr('钉钉登录尚未配置，请联系企业管理员完成应用授权。','DingTalk sign-in is not configured yet. Ask your organization administrator to authorize the application.')}</p>`}${button(tr('重新检查','Check again'),'refresh','','refresh')}`}${state.error ? `<p class="form-error" role="alert">${esc(state.error)}</p>` : ''}</div></div></main><footer class="gateway-footer"><span>${tr('企业模式 · 真实登录与服务端授权','Company mode · authenticated server access')}</span><span>${tr('仅语言和主题偏好保存在本机','Only language and theme preferences are stored locally')}</span></footer></div>`;
   }
   function render() {
-    if(state.actor)window.CompanySupport?.configure({api,actor:state.actor,language:i18n.lang,changed:render,showModal:modal});
+    if(state.actor)window.CompanySupport?.configure({api,actor:state.actor,language:i18n.lang,changed:render,showModal:modal,active:state.page==='knowledge',view:state.page});
     document.documentElement.lang = i18n.lang === 'en' ? 'en' : 'zh-CN';
     document.title = `${state.actor ? tr(...(navs.find(item => item[0] === state.page)?.slice(2) || ['工作空间','Workspace'])) : tr('登录','Sign in')} · OneLaser`;
     if (!state.actor) { document.getElementById('app').innerHTML = renderLogin(); return; }
@@ -204,12 +217,12 @@
     state.details.clear();
     state.executive = null;
     if(state.actor.executiveAccess) state.executive = await api.get('/executive/summary');
-    window.CompanySupport?.configure({api,actor:state.actor,language:i18n.lang,changed:render,showModal:modal});
+    window.CompanySupport?.configure({api,actor:state.actor,language:i18n.lang,changed:render,showModal:modal,active:state.page==='knowledge',view:state.page});
     await window.CompanySupport?.refresh().catch(()=>{});
   }
   async function bootstrap() {
     closeOverlay(); state.loading = true; state.error = ''; render();
-    try { state.capabilities = await api.get('/capabilities'); try { state.actor = await api.get('/me'); } catch (error) { if (error.status !== 401) throw error; clearPrivateData(); } if (state.actor) { if(state.actor.executiveAccess)state.page='executive'; await refreshData(); } }
+    try { state.capabilities = await api.get('/capabilities'); try { state.actor = await api.get('/me'); } catch (error) { if (error.status !== 401) throw error; clearPrivateData(); } if (state.actor) { if(!routePage()&&state.actor.executiveAccess)state.page='executive';if(state.page==='executive'&&!state.actor.executiveAccess)state.page='overview'; await refreshData(); } }
     catch (error) { if (!handleAuthError(error)) state.error = explainError(error); }
     finally { state.loading = false; render(); }
   }
@@ -251,8 +264,8 @@
   }
   document.addEventListener('click',event => {
     const target = event.target.closest('button,[data-live-task]'); if (!target) { if (event.target.matches('[data-live-overlay]')) closeOverlay(); return; }
-    if (target.dataset.liveLang) { const id = openTaskId; i18n.set(target.dataset.liveLang); closeOverlay(); render(); if (id) openTask(id); return; }
-    if (target.dataset.livePage) { const samePage=state.page===target.dataset.livePage; state.page = target.dataset.livePage === 'executive' && !state.actor.executiveAccess ? 'overview' : target.dataset.livePage; state.menu = false; closeOverlay(); if(!samePage||!preserveWikiFrame())render(); return; }
+    if (target.dataset.liveLang) { const id = openTaskId; i18n.set(target.dataset.liveLang); if(!document.querySelector('[data-company-review]'))closeOverlay(); render(); if (id) openTask(id); return; }
+    if (target.dataset.livePage) { const page=target.dataset.livePage; if(!navs.some(item=>item[0]===page))return; if(page===state.page){state.menu=false;closeOverlay();if(!updateShellChrome())render();return;} window.location.hash=page==='knowledge'?'knowledge/':page; applyRoute(); return; }
     if (target.dataset.liveTask) { openTask(target.dataset.liveTask); return; }
     if (target.dataset.liveAppraisal) { openAppraisal(target.dataset.liveAppraisal); return; }
     if (target.dataset.liveObjectiveSource) { openObjectiveSource(target.dataset.liveObjectiveSource); return; }
@@ -261,8 +274,8 @@
     const action = target.dataset.liveAction; if (!action) return;
     if (action === 'close') { closeOverlay(); return; }
     if (action === 'login') { window.location.assign(api.url('/auth/dingtalk/start')); return; }
-    if (action === 'theme') { const id = openTaskId; theme = theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = theme; try { localStorage.setItem('onelaser-workos-theme',theme); } catch {} closeOverlay(); if(!preserveWikiFrame())render(); if (id) openTask(id); return; }
-    if (action === 'menu') { state.menu = !state.menu; if(!preserveWikiFrame())render(); return; }
+    if (action === 'theme') { theme = theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = theme; try { localStorage.setItem('onelaser-workos-theme',theme); } catch {} if(!updateShellChrome())render(); return; }
+    if (action === 'menu') { state.menu = !state.menu; if(!updateShellChrome())render(); return; }
     if (action === 'new-task') { newTask(); return; }
     if (action === 'new-objective') { newObjective(); return; }
     if (action === 'list' || action === 'board') { state.board = action === 'board'; render(); return; }
@@ -288,7 +301,7 @@
     finally { busy = false; buttons.forEach(button => button.disabled = false); const task = state.details.get(openTaskId); if (task) patchAnalysis(task); }
   });
   document.addEventListener('keydown',event => {
-    if (event.key === 'Escape') { closeOverlay(); if (state.menu) { state.menu = false; if(!preserveWikiFrame())render(); } }
+    if (event.key === 'Escape') { closeOverlay(); if (state.menu) { state.menu = false; if(!updateShellChrome())render(); } }
     if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('tr[data-live-task]')) { event.preventDefault(); openTask(event.target.dataset.liveTask); }
     if (event.key === 'Tab') { const dialog = document.querySelector('#overlay-root [role="dialog"]'); if (!dialog) return; const focusable = Array.from(dialog.querySelectorAll('button,input,select,textarea,a[href],summary,[tabindex="0"]')).filter(element=>!element.disabled&&element.getClientRects().length); const first = focusable[0], last = focusable.at(-1); if (!first) { event.preventDefault(); return; } if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } }
   });

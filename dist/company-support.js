@@ -1,14 +1,14 @@
 'use strict';
 window.CompanySupport = (() => {
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let api,actor,language='zh',changed,showModal,cache={},tab='tickets',query='',knowledgeTab='wiki';
-  const wikiOrigin='https://yonge6.github.io/onelaser-support-center/';
+  let api,actor,language='zh',changed,showModal,cache={},tab='tickets',query='',viewContext='',openGeneration=0;
   const tr=(zh,en)=>language==='en'?en:zh;
   const date=v=>v?new Date(v).toLocaleString(language==='en'?'en-GB':'zh-CN'):'—';
   const safe=v=>{try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password?u.href:'';}catch{return '';}};
   const source=s=>safe(s.url)?`<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.title||s.url)}</a> <small>${esc(s.version||'')}</small>`:esc(s.title||'');
-  function configure(options){({api,actor,changed,showModal}=options);language=options.language;}
-  function reset(){cache={};actor=null;query='';tab='tickets';knowledgeTab='wiki';}
+  function configure(options){const nextContext=[options.actor?.id,options.view,window.location?.hash||''].join('|');if(nextContext!==viewContext){viewContext=nextContext;openGeneration++;}({api,actor,changed,showModal}=options);language=options.language;window.WorkOSWiki?.configure({language,changed,active:!!actor&&options.active===true&&!isArchive()});}
+  const isArchive=()=>/^#knowledge\/archive(?:[?]|$)/.test(window.location?.hash||'');
+  function reset(){openGeneration++;viewContext='';cache={};actor=null;query='';tab='tickets';window.WorkOSWiki?.reset();}
   async function refresh(){
     const identity=actor?.id;if(!identity)return;cache={};
     const list=await api.get('/support/library');if(actor?.id!==identity)return;cache.library=list;
@@ -23,8 +23,8 @@ window.CompanySupport = (() => {
   function summary(){const s=cache.summary;return `<section class="panel live-space-top"><div class="panel-head"><h2>${tr('客服运营','Customer support')}</h2><button class="btn small" data-live-page="support">${tr('进入客服工作台','Open support')}</button></div><div class="panel-body">${freshness(s)}<div class="stats-grid live-space-top">${card(tr('跟踪工单','Tracked tickets'),s?.counts?.tickets)}${card(tr('当前待审核草稿','Current pending drafts'),s?.counts?.drafts)}${card(tr('需要关注','Needs attention'),s?.counts?.attention)}${card(tr('知识文章','Knowledge articles'),s?.counts?.articles)}</div><p class="fine">${tr('统计范围为试运行已跟踪工单，不代表 Zoho 全部工单。','Counts cover tracked pilot tickets, not the entire Zoho account.')}</p></div></section>`;}
   function header(title,detail){return `<div class="page-heading"><div><div class="eyebrow">ONELASER · COMPANY WORKSPACE</div><h1>${title}</h1><p>${detail}</p></div><button class="btn" data-company-refresh>${tr('刷新','Refresh')}</button></div>`;}
   function knowledge(){
-    const locale=language==='en'?'en':'zh',url=wikiOrigin+'?lang='+locale,embeddedUrl='/wiki/?lang='+locale;
-    return `<section class="company-knowledge"><div class="page-heading"><div><div class="eyebrow">ONELASER · KNOWLEDGE CENTER</div><h1>${tr('知识中心 / Wiki','Knowledge center / Wiki')}</h1></div><a class="btn" href="${url}" target="_blank" rel="noopener noreferrer">${tr('新窗口打开原站 ↗','Open original site ↗')}</a></div><div class="inline-actions company-knowledge-tabs" role="group" aria-label="${tr('知识中心视图','Knowledge center views')}">${[['wiki','知识中心 / Wiki','Knowledge center / Wiki'],['archive','档案与核对','Archive & review']].map(([id,zh,en])=>`<button class="btn ${knowledgeTab===id?'primary':''}" data-company-knowledge="${id}" aria-pressed="${knowledgeTab===id}">${tr(zh,en)}</button>`).join('')}</div>${knowledgeTab==='archive'?archive():`<iframe class="company-wiki-frame" src="${embeddedUrl}" title="${tr('OneLaser 知识中心完整网站','Complete OneLaser knowledge center')}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" referrerpolicy="no-referrer"></iframe><p class="fine company-wiki-help">${tr('首页、产品指南、搜索和下载中心均保留原站。若页面未显示，可在新窗口打开。','The original homepage, product guides, search and downloads are preserved. If the page does not load, open it in a new window.')}</p>`}</section>`;
+    const content=isArchive()?`${window.WorkOSWiki?.renderNav?.()||`<a class="btn" href="#knowledge/">${tr('返回指南','Back to guides')}</a>`}${archive()}`:window.WorkOSWiki?.render()||`<div class="notice amber" role="alert">${tr('知识中心暂未加载，请刷新后重试。','The knowledge center could not load. Refresh to retry.')}</div>`;
+    return `<section class="company-knowledge"><div class="page-heading"><div><div class="eyebrow">ONELASER · KNOWLEDGE CENTER</div><h1>${tr('知识中心 / Wiki','Knowledge center / Wiki')}</h1><p>${tr('产品指南、问题排查与下载资源。','Product guides, troubleshooting and downloads.')}</p></div></div>${content}</section>`;
   }
   function archive(){const items=cache.library?.items||[],terms=query.toLowerCase().split(/\s+/).filter(Boolean),filtered=items.filter(a=>terms.every(t=>(a.title+' '+a.family).toLowerCase().includes(t)));return `<section class="panel"><div class="panel-head"><div><h2>${tr('资料档案与人工核对','Source archive & human review')}</h2><p class="fine">${tr('保留原文、来源版本和已有核对记录。','Original content, source versions and existing review records are retained.')}</p></div><button class="btn small" data-company-refresh>${tr('刷新档案','Refresh archive')}</button></div><div class="panel-body"><label class="field"><span>${tr('搜索标题或产品系列','Search title or product family')}</span><input data-company-search value="${esc(query)}" placeholder="${tr('例如：Hydra、安装、firmware','For example: Hydra, setup, firmware')}"></label><p class="fine">${filtered.length} / ${items.length}</p></div>${filtered.map(a=>`<button class="todo-row company-archive-row" data-company-article="${esc(a.id)}"><span class="todo-body"><h3>${esc(a.title)}</h3><span class="todo-meta">${esc(a.family)} · ${esc(a.sourceVersion)}</span></span><span>→</span></button>`).join('')||`<div class="empty">${tr('没有可用文章，请检查同步状态。','No articles available. Check sync status.')}</div>`}</section>`;}
   function support(){const s=cache.summary;return `${header(tr('客服工作台','Support workspace'),tr('工单、回复草稿、知识与服务标准，在一个工作空间内处理。','Tickets, response drafts, knowledge and service standards in one workspace.'))}${freshness(s)}<div class="inline-actions live-space-top company-tabs">${[['tickets','工单与草稿','Tickets & drafts'],['answers','标准回复','Standard answers'],['sla','SLA 草案','SLA draft'],['operations','自动化状态','Automation status']].map(([id,zh,en])=>`<button class="btn ${id===tab?'primary':''}" data-company-tab="${id}">${tr(zh,en)}</button>`).join('')}</div><div class="live-space-top">${tab==='tickets'?tickets():tab==='answers'?answers():tab==='sla'?sla():operations()}</div>`;}
@@ -35,21 +35,23 @@ window.CompanySupport = (() => {
   function reviewForm(kind,id,contentHash,enabled){if(!actor?.supportAccess?.review)return '';return `<form data-company-review data-kind="${kind}" data-id="${esc(id)}" data-hash="${esc(contentHash)}"><h3>${tr('人工核对记录','Human review record')}</h3><label class="field"><span>${tr('结论','Finding')}</span><select name="decision"><option value="reviewed">${tr('已核对，可供人工参考','Reviewed for human reference')}</option><option value="changes_requested">${tr('需要修改','Changes requested')}</option></select></label><label class="field"><span>${tr('说明','Notes')}</span><textarea name="note" required minlength="3" maxlength="4000"></textarea></label><label class="form-check"><input type="checkbox" name="confirm" required><span>${tr('我已核对当前版本及引用来源。此操作不会发送客户邮件或发布内容。','I checked this version and its sources. This does not send customer mail or publish content.')}</span></label><button class="btn primary live-space-top" ${enabled?'':'disabled'}>${tr('保存核对记录','Save review record')}</button><p class="form-error" role="alert"></p></form>`;}
   const history=items=>`<h3 class="live-space-top">${tr('核对记录','Review history')}</h3>${items.length?items.map(r=>`<p><strong>${esc(r.display_name)}</strong> · ${esc(r.decision)} · ${date(r.created_at)}<br>${esc(r.note)}</p>`).join(''):`<p class="fine">${tr('暂无记录','No records yet')}</p>`}`;
   async function open(kind,id){
-    const identity=actor.id;let title,body;
+    const identity=actor.id,generation=++openGeneration,current=()=>actor?.id===identity&&generation===openGeneration;let title,body;
+    try{
     if(kind==='ticket'){
-      const data=await api.get('/support/tickets/'+encodeURIComponent(id));if(actor?.id!==identity)return;
+      const data=await api.get('/support/tickets/'+encodeURIComponent(id));if(!current())return;
       title='#'+(data.ticket.number||data.ticket.id)+' '+data.ticket.subject;
       body=`<p>${tr('回复到期','Reply due')}: ${date(data.ticket.responseDueAt)} · ${tr('解决到期','Resolution due')}: ${date(data.ticket.resolutionDueAt)}</p>${freshness(data)}${data.drafts.map(d=>`<section class="company-draft"><h3>v${d.version} · ${esc(d.status)} · ${date(d.createdAt)}</h3><pre class="company-prose">${esc(d.body)}</pre><h4>${tr('引用来源','Sources')}</h4><ul>${d.sources.map(s=>`<li>${source(s)}</li>`).join('')}</ul>${reviewForm('draft',d.id,d.contentHash,d.reviewable)}${history(data.reviews.filter(r=>r.entity_id===d.id))}</section>`).join('')||`<p>${tr('暂无草稿','No draft available')}</p>`}`;
     }else{
-      const a=kind==='article'?await api.get('/support/articles/'+encodeURIComponent(id)):cache.answers?.items.find(a=>a.id===id);if(!a||actor?.id!==identity)return;
-      const reviews=actor.supportAccess?.read?await api.get('/support/reviews/'+kind+'/'+encodeURIComponent(id)):{items:[]};if(actor?.id!==identity)return;
+      const a=kind==='article'?await api.get('/support/articles/'+encodeURIComponent(id)):cache.answers?.items.find(a=>a.id===id);if(!a||!current())return;
+      const reviews=actor.supportAccess?.read?await api.get('/support/reviews/'+kind+'/'+encodeURIComponent(id)):{items:[]};if(!current())return;
       title=a.title;body=`<pre class="company-prose">${esc(a.body)}</pre>${kind==='article'?source({url:a.sourceUrl,title:tr('查看原始资料','View original source'),version:a.sourceVersion}):`<p>${esc(a.note)}</p><ul>${a.sources.map(s=>`<li>${source(s)}</li>`).join('')}</ul>`}${reviewForm(kind,a.id,a.contentHash,cache.summary?.connected&&!cache.summary?.stale)}${history(reviews.items)}`;
     }
-    showModal(esc(title),body);
+    if(current())showModal(esc(title),body);
+    }catch(error){if(current())throw error;}
   }
   document.addEventListener('click',async e=>{
-    const t=e.target.closest('[data-company-tab],[data-company-knowledge],[data-company-refresh],[data-company-ticket],[data-company-article],[data-company-answer]');if(!t||!actor)return;
-    try{if(t.dataset.companyKnowledge){const next=t.dataset.companyKnowledge==='archive'?'archive':'wiki';if(next!==knowledgeTab){knowledgeTab=next;changed();}}else if(t.dataset.companyTab){tab=t.dataset.companyTab;changed();}else if(t.hasAttribute('data-company-refresh')){await refresh();changed();}else await open(t.dataset.companyTicket?'ticket':t.dataset.companyArticle?'article':'answer',t.dataset.companyTicket||t.dataset.companyArticle||t.dataset.companyAnswer);}catch{showModal(tr('暂时无法读取','Temporarily unavailable'),tr('请刷新或重新登录后重试。','Refresh or sign in again.'));}
+    const t=e.target.closest('[data-company-tab],[data-company-refresh],[data-company-ticket],[data-company-article],[data-company-answer]');if(!t||!actor)return;
+    try{if(t.dataset.companyTab){tab=t.dataset.companyTab;changed();}else if(t.hasAttribute('data-company-refresh')){await refresh();changed();}else await open(t.dataset.companyTicket?'ticket':t.dataset.companyArticle?'article':'answer',t.dataset.companyTicket||t.dataset.companyArticle||t.dataset.companyAnswer);}catch{showModal(tr('暂时无法读取','Temporarily unavailable'),tr('请刷新或重新登录后重试。','Refresh or sign in again.'));}
   });
   document.addEventListener('change',e=>{if(e.target.matches('[data-company-search]')){query=e.target.value;changed();}});
   document.addEventListener('submit',async e=>{

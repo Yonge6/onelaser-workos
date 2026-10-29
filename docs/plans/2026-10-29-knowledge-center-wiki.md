@@ -1,5 +1,7 @@
 # Knowledge Center / Wiki Implementation Plan
 
+**Superseded:** The user requested native integration, not embedding. See `2026-10-29-native-wiki.md` for the replacement architecture.
+
 **Goal:** Make the existing complete OneLaser support center the default Wiki view inside Work OS, preserving its original public URL and every route, asset and feature.
 
 **Architecture:** Embed the exact public support-center site in a cross-origin, sandboxed iframe. Keep the authenticated archive and source-bound review records as a secondary view. The parent sends only an initial public language preference in the URL; no employee identity, credentials, tickets, review data or postMessage bridge is shared. The existing source site is unchanged.
