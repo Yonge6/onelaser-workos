@@ -30,7 +30,49 @@ window.CompanySupport = (() => {
   function support(){const s=cache.summary;return `${header(tr('客服工作台','Support workspace'),tr('工单、回复草稿、知识与服务标准，在一个工作空间内处理。','Tickets, response drafts, knowledge and service standards in one workspace.'))}${freshness(s)}<div class="inline-actions live-space-top company-tabs">${[['tickets','工单与草稿','Tickets & drafts'],['answers','标准回复','Standard answers'],['sla','SLA 草案','SLA draft'],['operations','自动化状态','Automation status']].map(([id,zh,en])=>`<button class="btn ${id===tab?'primary':''}" data-company-tab="${id}">${tr(zh,en)}</button>`).join('')}</div><div class="live-space-top">${tab==='tickets'?tickets():tab==='answers'?answers():tab==='sla'?sla():operations()}</div>`;}
   function tickets(){return `<section class="panel"><div class="panel-head"><h2>${tr('已跟踪的工单','Tracked tickets')}</h2></div><div class="table-wrap"><table class="task-table"><thead><tr><th>${tr('工单','Ticket')}</th><th>${tr('状态','Status')}</th><th>${tr('需要关注','Needs attention')}</th><th>${tr('同步时间','Observed')}</th></tr></thead><tbody>${(cache.tickets?.items||[]).map(t=>`<tr><td><button class="company-text-button" data-company-ticket="${esc(t.id)}"><strong>#${esc(t.number||t.id)}</strong><br>${esc(t.subject||tr('查看工单','View ticket'))}</button></td><td>${esc(t.status)}</td><td>${t.reasons.length?esc(t.reasons.join(' · ')):'—'}</td><td>${date(t.observedAt)}</td></tr>`).join('')}</tbody></table></div><p class="fine panel-body">${tr('AI 草稿不算客户已收到回复。点击工单查看版本、来源与人工审核记录。','An AI draft does not mean the customer received a reply. Open a ticket for versions, sources and human reviews.')}</p></section>`;}
   function answers(){return `<section class="panel"><div class="panel-head"><h2>${tr('标准回复候选','Standard response candidates')}</h2></div>${(cache.answers?.items||[]).map(a=>`<button class="todo-row" data-company-answer="${esc(a.id)}"><span class="todo-body"><h3>${esc(a.title)}</h3><span class="todo-meta">${esc(a.id)} · ${esc(a.family)}</span></span><span>→</span></button>`).join('')}<p class="fine panel-body">${tr('仅供人工核对。审核不会自动启用 Bot 复用或向客户发送。','For human review. Reviewing does not enable automatic Bot reuse or customer delivery.')}</p></section>`;}
-  function sla(){return `<section class="panel"><div class="panel-head"><h2>${tr('服务标准 · 待确认','Service standards · draft')}</h2><span class="badge amber">${tr('尚未生效','Not active')}</span></div><div class="panel-body"><pre class="company-prose">${esc(cache.sla?.policy?.body||tr('等待同步 SLA 草案','Awaiting SLA draft sync'))}</pre></div></section>`;}
+  // Render the SLA document's text-only Markdown subset; source HTML is never executable.
+  function documentInline(value){
+    const text=String(value),pattern=/(`+)([^\n]*?)\1|\*\*([^\n]+?)\*\*/g;let html='',offset=0,match;
+    while((match=pattern.exec(text))){html+=esc(text.slice(offset,match.index));html+=match[1]?`<code>${esc(match[2])}</code>`:`<strong>${documentInline(match[3])}</strong>`;offset=pattern.lastIndex;}
+    return html+esc(text.slice(offset));
+  }
+  function documentCells(line){
+    const cells=[];let cell='',code='';
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='\\'&&line[i+1]==='|'&&!code){cell+='|';i++;continue;}
+      if(ch==='`'){let ticks=ch;while(line[i+1]==='`'){ticks+='`';i++;}if(!code)code=ticks;else if(code===ticks)code='';cell+=ticks;continue;}
+      if(ch==='|'&&!code){cells.push(cell.trim());cell='';}else cell+=ch;
+    }
+    cells.push(cell.trim());if(cells[0]==='')cells.shift();if(cells.at(-1)==='')cells.pop();return cells;
+  }
+  function renderSlaDocument(value){
+    const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n');let html='',paragraph=[];
+    const flush=()=>{if(paragraph.length){html+=`<p>${documentInline(paragraph.join(' '))}</p>`;paragraph=[];}};
+    const bullet=line=>line.match(/^\s{0,3}(?:([-+*])|(\d+)[.)])\s+(.+)$/);
+    for(let i=0;i<lines.length;){
+      const line=lines[i],trim=line.trim();
+      if(!trim){flush();i++;continue;}
+      const heading=line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*$/);
+      if(heading){flush();const level=Math.min(6,heading[1].length+1),title=heading[2].replace(/\s+#+\s*$/,'');html+=`<h${level}>${documentInline(title)}</h${level}>`;i++;continue;}
+      const separators=i+1<lines.length?documentCells(lines[i+1]):[];
+      const headers=documentCells(line);
+      if(line.includes('|')&&separators.length===headers.length&&separators.length&&separators.every(cell=>/^:?-{3,}:?$/.test(cell))){
+        flush();const rows=[];i+=2;
+        while(i<lines.length&&lines[i].trim()&&lines[i].includes('|')){const cells=documentCells(lines[i]);if(cells.length!==headers.length)break;rows.push(cells);i++;}
+        html+=`<div class="company-document-table" role="region" aria-label="${tr('服务标准表格','Service standards table')}" tabindex="0"><table><thead><tr>${headers.map(cell=>`<th scope="col">${documentInline(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(cell=>`<td>${documentInline(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;continue;
+      }
+      const item=bullet(line);
+      if(item){
+        flush();const ordered=!!item[2],tag=ordered?'ol':'ul',start=ordered&&Number(item[2])>1?` start="${Number(item[2])}"`:'';html+=`<${tag}${start}>`;
+        while(i<lines.length){const next=bullet(lines[i]);if(!next||!!next[2]!==ordered)break;html+=`<li>${documentInline(next[3])}</li>`;i++;}
+        html+=`</${tag}>`;continue;
+      }
+      paragraph.push(trim);i++;
+    }
+    flush();return html;
+  }
+  function sla(){return `<section class="panel"><div class="panel-head"><h2>${tr('服务标准 · 待确认','Service standards · draft')}</h2><span class="badge amber">${tr('尚未生效','Not active')}</span></div><div class="panel-body"><article class="company-document">${renderSlaDocument(cache.sla?.policy?.body||tr('等待同步 SLA 草案','Awaiting SLA draft sync'))}</article></div></section>`;}
   function operations(){const s=cache.summary;return `<section class="panel"><div class="panel-head"><h2>${tr('客服自动化运行状态','Support automation status')}</h2></div><div class="panel-body"><dl class="company-facts"><dt>${tr('运行位置','Runtime')}</dt><dd>${tr('当前 Mac 试运行，休眠或断网会中断自动化','Current Mac pilot; sleep or loss of connectivity interrupts automation')}</dd><dt>${tr('工单最近读取成功','Last successful ticket poll')}</dt><dd>${date(s?.pollerLastSuccess)}</dd><dt>${tr('时限最近检查成功','Last successful deadline check')}</dt><dd>${date(s?.watchLastSuccess)}</dd><dt>${tr('Grok 派发','Grok dispatch')}</dt><dd>${s?.dispatchPaused==null?'—':s.dispatchPaused?tr('已暂停','Paused'):tr('未暂停，请结合运行时间判断','Not paused; check runtime timestamps')}</dd><dt>${tr('排队任务 / 需核对任务','Queued / needs verification')}</dt><dd>${s?.jobs?.pending??'—'} / ${s?.jobs?.attention??'—'}</dd><dt>${tr('客户自动发送','Automatic customer delivery')}</dt><dd>${tr('关闭','Disabled')}</dd></dl><p class="fine">${tr('此处读取现有后台的状态，不重复启动派发，也不自动重试结果不明确的任务。','This screen reads the existing backend. It does not start a second dispatcher or retry ambiguous jobs.')}</p></div></section>`;}
   function reviewForm(kind,id,contentHash,enabled){if(!actor?.supportAccess?.review)return '';return `<form data-company-review data-kind="${kind}" data-id="${esc(id)}" data-hash="${esc(contentHash)}"><h3>${tr('人工核对记录','Human review record')}</h3><label class="field"><span>${tr('结论','Finding')}</span><select name="decision"><option value="reviewed">${tr('已核对，可供人工参考','Reviewed for human reference')}</option><option value="changes_requested">${tr('需要修改','Changes requested')}</option></select></label><label class="field"><span>${tr('说明','Notes')}</span><textarea name="note" required minlength="3" maxlength="4000"></textarea></label><label class="form-check"><input type="checkbox" name="confirm" required><span>${tr('我已核对当前版本及引用来源。此操作不会发送客户邮件或发布内容。','I checked this version and its sources. This does not send customer mail or publish content.')}</span></label><button class="btn primary live-space-top" ${enabled?'':'disabled'}>${tr('保存核对记录','Save review record')}</button><p class="form-error" role="alert"></p></form>`;}
   const history=items=>`<h3 class="live-space-top">${tr('核对记录','Review history')}</h3>${items.length?items.map(r=>`<p><strong>${esc(r.display_name)}</strong> · ${esc(r.decision)} · ${date(r.created_at)}<br>${esc(r.note)}</p>`).join(''):`<p class="fine">${tr('暂无记录','No records yet')}</p>`}`;
