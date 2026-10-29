@@ -215,3 +215,41 @@ for (const outcome of ['success', 'failure']) {
     assert.match(h.document.getElementById('app').textContent, /Sign in with DingTalk/);
   });
 }
+
+const noSession=(path)=>path==='/api/me'?{status:401,ok:false,json:async()=>({error:{code:'UNAUTHENTICATED',message:'Sign in'}})}:undefined;
+for(const hash of ['#knowledge/','#knowledge/search?q=firmware','#knowledge/downloads','#knowledge/family/hydra-series','#knowledge/article/en-38']){
+  test('anonymous native Wiki route is public without requesting employee data: '+hash,async()=>{
+    const h=await harness({hash,fetchOverride:noSession});
+    assert.ok(h.document.querySelector('.public-wiki-shell'));
+    assert.ok(h.document.querySelector('.wiki-root'));
+    assert.match(h.document.querySelector('#app').textContent,/Employee sign in/);
+    assert.equal(h.document.querySelector('[data-live-page="tasks"]'),null);
+    assert.deepEqual(h.calls.map(c=>c.path),['/api/capabilities','/api/me']);
+    assert.equal(h.wikiContexts.at(-1).canViewArchive,false);
+    assert.equal(h.wikiContexts.at(-1).active,true);
+  });
+}
+for(const hash of ['#tasks','#support','#performance','#knowledge/archive','#knowledge/article/en-38/private']){
+  test('anonymous private and malformed routes keep the login gate: '+hash,async()=>{
+    const h=await harness({hash,fetchOverride:noSession});
+    assert.equal(h.document.querySelector('.public-wiki-shell'),null);
+    assert.match(h.document.querySelector('#app').textContent,/Sign in with DingTalk/);
+    assert.equal(h.document.querySelector('.wiki-root'),null);
+    assert.equal(h.wikiContexts.at(-1).active,false);
+    assert.deepEqual(h.calls.map(c=>c.path),['/api/capabilities','/api/me']);
+  });
+}
+test('anonymous Wiki theme controls keep the same native page and unsubmitted search',async()=>{
+  const h=await harness({hash:'#knowledge/search',fetchOverride:noSession});
+  const page=h.document.querySelector('.wiki-root'),input=h.document.querySelector('#native-query');input.value='Keep unsubmitted search';
+  await h.click('[data-live-action="theme"]');
+  assert.equal(h.document.querySelector('.wiki-root'),page);assert.equal(input.value,'Keep unsubmitted search');
+  assert.equal(h.document.documentElement.dataset.theme,'dark');
+});
+test('signing out on the native Wiki switches to visitor navigation and excludes the archive',async()=>{
+  const h=await harness({hash:'#knowledge/article/en-38'});await h.click('[data-live-action="logout"]');
+  assert.ok(h.document.querySelector('.public-wiki-shell'));
+  assert.ok(h.document.querySelector('.wiki-root'));
+  assert.equal(h.wikiContexts.at(-1).canViewArchive,false);
+  assert.equal(h.document.querySelector('[data-live-page="support"]'),null);
+});

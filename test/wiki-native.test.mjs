@@ -211,3 +211,9 @@ test('explicit public preloading deduplicates requests and makes repeated naviga
  assert.equal(h.requests.length,2);
  h.ui.reset();await h.ui.preload();assert.equal(h.requests.length,4);
 });
+
+test('visitor navigation excludes private archive while employee navigation retains it',async()=>{
+  const h=harness();await h.ui.ensureLoaded();
+  h.ui.configure({canViewArchive:false});h.render();assert.equal(h.mount.querySelector('a[href="#knowledge/archive"]'),null);
+  h.ui.configure({canViewArchive:true});h.render();assert.ok(h.mount.querySelector('a[href="#knowledge/archive"]'));
+});
