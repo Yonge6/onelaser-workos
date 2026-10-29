@@ -98,3 +98,7 @@ The HTML uses matching version query parameters for scripts and styles. Update t
 ## Backend API
 
 The [backend API source](https://github.com/Yonge6/onelaser-workos-api) is maintained separately. GitHub Pages defaults to browser-local demo data. Company mode calls that backend through same-origin `/api`. Real DingTalk, model and notification availability depends on server configuration and production acceptance.
+
+## Knowledge center / Wiki
+
+Knowledge center / Wiki embeds the complete existing [OneLaser knowledge center](https://yonge6.github.io/onelaser-support-center/), retaining its homepage, product families, full-text search, downloads, article navigation, images, sources and bilingual interface, with an original-site link. The source site and its publishing flow remain unchanged. Archive & review retains authenticated source snapshots and human review records. Shell theme and mobile navigation changes preserve the current Wiki page.

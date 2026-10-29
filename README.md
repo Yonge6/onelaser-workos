@@ -95,3 +95,7 @@ python3 -m http.server 8867 --bind 127.0.0.1 --directory dist
 ## 后台 API
 
 [后台 API 源码](https://github.com/Yonge6/onelaser-workos-api)单独维护。GitHub Pages 默认使用浏览器本地演示数据；企业真实模式通过同源 `/api` 调用后台。钉钉、模型和通知的真实可用性以服务端配置与线上验收为准。
+
+## 知识中心 / Wiki
+
+知识中心 / Wiki 默认完整载入现有 [OneLaser 知识中心](https://yonge6.github.io/onelaser-support-center/)，保留首页、产品分类、全文搜索、下载页、文章目录、图片、原始来源及中英界面，并提供新窗口打开入口。原站内容和发布流程保持不变；“档案与核对”保留服务端原文档案及已有人工核对记录。外壳主题与移动导航操作不会重置正在阅读的 Wiki 页面。

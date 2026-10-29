@@ -18,7 +18,7 @@
   const labels = { planned: ['已分派', 'Assigned', ''], doing: ['进行中', 'In progress', 'blue'], blocked: ['有阻塞', 'Blocked', 'red'], submitted: ['待验收', 'Awaiting review', 'amber'], accepted: ['已验收', 'Accepted', 'green'], revision: ['待补充', 'Needs more evidence', 'amber'] };
   const statusLabel = status => { const item = labels[status]; return item ? tr(item[0], item[1]) : status; };
   const badge = status => `<span class="badge ${labels[status]?.[2] || ''}"><span class="dot"></span>${esc(statusLabel(status))}</span>`;
-  const navs = [['executive','home','老板看板','Executive overview'],['overview','home','工作台','Overview'],['tasks','task','任务中心','Task hub'],['okr','target','OKR 目标','OKRs'],['reviews','review','成果验收','Deliverable review'],['performance','team','绩效参考','Performance insights'],['support','review','客服工作台','Support workspace'],['knowledge','file','公司知识库','Company knowledge'],['integrations','plug','集成与通知','Integrations & notifications']];
+  const navs = [['executive','home','老板看板','Executive overview'],['overview','home','工作台','Overview'],['tasks','task','任务中心','Task hub'],['okr','target','OKR 目标','OKRs'],['reviews','review','成果验收','Deliverable review'],['performance','team','绩效参考','Performance insights'],['support','review','客服工作台','Support workspace'],['knowledge','file','知识中心 / Wiki','Knowledge center / Wiki'],['integrations','plug','集成与通知','Integrations & notifications']];
   const levelLabel = value => ({company:tr('公司目标','Company objective'),department:tr('部门目标','Department objective'),personal:tr('个人目标','Individual objective')}[value] || value);
   const configured = value => value === true || ['configured','ready','enabled','connected'].includes(value);
   const botMode = () => state.capabilities.aiReviewMode === 'bot';
@@ -30,6 +30,15 @@
   const empty = text => `<div class="empty">${icon('file')}<p>${text}</p></div>`;
   function brand() { return `<div class="brand official-brand"><img class="brand-wordmark" src="./assets/onelaser-logo-${theme === 'dark' ? 'white' : 'black'}.svg" alt="OneLaser" width="2350" height="535"><small>Work OS</small></div>`; }
   function controls() { return `<div class="display-controls"><div class="language-switch" role="group" aria-label="${tr('界面语言','Interface language')}"><button data-live-lang="zh" lang="zh-CN" aria-label="中文" aria-pressed="${i18n.lang === 'zh'}" class="${i18n.lang === 'zh' ? 'active' : ''}">中</button><span aria-hidden="true">/</span><button data-live-lang="en" lang="en" aria-label="English" aria-pressed="${i18n.lang === 'en'}" class="${i18n.lang === 'en' ? 'active' : ''}">EN</button></div><button type="button" class="theme-toggle" data-live-action="theme" aria-label="${theme === 'dark' ? tr('切换到日间主题','Switch to light theme') : tr('切换到夜间主题','Switch to dark theme')}">${icon(theme === 'dark' ? 'sun' : 'moon')}</button></div>`; }
+  function preserveWikiFrame() {
+    if(state.page!=='knowledge'||!document.querySelector('.company-wiki-frame'))return false;
+    document.querySelector('.app-shell').classList.toggle('menu-open',state.menu);
+    document.querySelector('.brand-wordmark').setAttribute('src',`./assets/onelaser-logo-${theme==='dark'?'white':'black'}.svg`);
+    const toggle=document.querySelector('[data-live-action="theme"]');
+    toggle.innerHTML=icon(theme==='dark'?'sun':'moon');
+    toggle.setAttribute('aria-label',theme==='dark'?tr('切换到日间主题','Switch to light theme'):tr('切换到夜间主题','Switch to dark theme'));
+    return true;
+  }
   function heading(title, description, actions = '') { return `<div class="page-heading"><div><div class="eyebrow">WORK OS · ${tr('企业工作空间','COMPANY WORKSPACE')}</div><h1>${title}</h1><p>${description}</p></div><div class="heading-actions">${actions}</div></div>`; }
   function notice(text, style = '') { return `<div class="notice ${style}">${icon('shield')}<span>${text}</span></div>`; }
   function toast(text) { const target = document.getElementById('toast'); target.textContent = text; target.classList.add('show'); setTimeout(() => target.classList.remove('show'), 4000); }
@@ -235,7 +244,7 @@
   document.addEventListener('click',event => {
     const target = event.target.closest('button,[data-live-task]'); if (!target) { if (event.target.matches('[data-live-overlay]')) closeOverlay(); return; }
     if (target.dataset.liveLang) { const id = openTaskId; i18n.set(target.dataset.liveLang); closeOverlay(); render(); if (id) openTask(id); return; }
-    if (target.dataset.livePage) { state.page = target.dataset.livePage === 'executive' && !state.actor.executiveAccess ? 'overview' : target.dataset.livePage; state.menu = false; closeOverlay(); render(); return; }
+    if (target.dataset.livePage) { const samePage=state.page===target.dataset.livePage; state.page = target.dataset.livePage === 'executive' && !state.actor.executiveAccess ? 'overview' : target.dataset.livePage; state.menu = false; closeOverlay(); if(!samePage||!preserveWikiFrame())render(); return; }
     if (target.dataset.liveTask) { openTask(target.dataset.liveTask); return; }
     if (target.dataset.liveAppraisal) { openAppraisal(target.dataset.liveAppraisal); return; }
     if (target.dataset.liveNewKr) { newKr(target.dataset.liveNewKr); return; }
@@ -243,8 +252,8 @@
     const action = target.dataset.liveAction; if (!action) return;
     if (action === 'close') { closeOverlay(); return; }
     if (action === 'login') { window.location.assign(api.url('/auth/dingtalk/start')); return; }
-    if (action === 'theme') { const id = openTaskId; theme = theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = theme; try { localStorage.setItem('onelaser-workos-theme',theme); } catch {} closeOverlay(); render(); if (id) openTask(id); return; }
-    if (action === 'menu') { state.menu = !state.menu; render(); return; }
+    if (action === 'theme') { const id = openTaskId; theme = theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = theme; try { localStorage.setItem('onelaser-workos-theme',theme); } catch {} closeOverlay(); if(!preserveWikiFrame())render(); if (id) openTask(id); return; }
+    if (action === 'menu') { state.menu = !state.menu; if(!preserveWikiFrame())render(); return; }
     if (action === 'new-task') { newTask(); return; }
     if (action === 'new-objective') { newObjective(); return; }
     if (action === 'list' || action === 'board') { state.board = action === 'board'; render(); return; }
@@ -270,7 +279,7 @@
     finally { busy = false; buttons.forEach(button => button.disabled = false); const task = state.details.get(openTaskId); if (task) patchAnalysis(task); }
   });
   document.addEventListener('keydown',event => {
-    if (event.key === 'Escape') { closeOverlay(); if (state.menu) { state.menu = false; render(); } }
+    if (event.key === 'Escape') { closeOverlay(); if (state.menu) { state.menu = false; if(!preserveWikiFrame())render(); } }
     if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('tr[data-live-task]')) { event.preventDefault(); openTask(event.target.dataset.liveTask); }
     if (event.key === 'Tab') { const dialog = document.querySelector('#overlay-root [role="dialog"]'); if (!dialog) return; const focusable = Array.from(dialog.querySelectorAll('button,input,select,textarea,a[href],summary,[tabindex="0"]')).filter(element=>!element.disabled&&element.getClientRects().length); const first = focusable[0], last = focusable.at(-1); if (!first) { event.preventDefault(); return; } if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } }
   });
