@@ -67,6 +67,31 @@ test('reply feedback requires deliberate sent-mail pairing and saves reason/outc
   assert.deepEqual([...payload.reasonCodes],['facts','technical']);assert.equal(payload.reasonNote,'Verified against the fixture guide');assert.equal(payload.outcome,'unresolved');
   assert.match(h.document.querySelector('[data-company-edit-history]').textContent,/Fact correction/);
   assert.match(h.document.querySelector('[data-company-edit-history]').textContent,/s1/);
+  assert.match(h.document.querySelector('[data-company-edit-history] > details > summary').textContent,/AI v2/);
+  assert.equal(h.document.querySelector('[data-company-edit-history] > details > details pre').textContent,'Original fictional draft');
+});
+
+test('saved history retains the submitted draft snapshot while the selection or source changes during save',async()=>{
+  let finish;const h=await harness({post:()=>new Promise(resolve=>finish=resolve)});
+  h.detail.drafts.push({...h.detail.drafts[0],id:'d2',version:7,contentHash:'c'.repeat(64),body:'Different later draft'});
+  await h.click('[data-company-ticket]');const form=h.document.querySelector('[data-company-reply-edit]');form.elements.draftId.value='d1';form.elements.body.value='Submitted staff revision';
+  const pending=h.emit('submit',form);
+  assert.equal(h.calls[0].payload.draftId,'d1');assert.equal(h.calls[0].payload.draftHash,draftHash);
+  form.elements.draftId.value='d2';form.elements.body.value='Newer unsaved staff change';
+  h.document.querySelector('[data-company-draft-body="d1"]').textContent='DOM source replaced while save was pending';
+  finish({id:randomUUID()});await pending;
+  const record=h.document.querySelector('[data-company-edit-history] > details');
+  assert.match(record.querySelector(':scope > summary').textContent,/AI v2/);assert.doesNotMatch(record.querySelector(':scope > summary').textContent,/No linked draft|AI v7/);
+  assert.equal(record.querySelector(':scope > pre').textContent,'Submitted staff revision');
+  assert.equal(record.querySelector(':scope > details pre').textContent,'Original fictional draft');
+  assert.equal(form.elements.body.value,'Newer unsaved staff change');assert.equal(form.elements.draftId.value,'d2');
+});
+
+test('saving an intentionally unlinked revision does not invent draft history',async()=>{
+  const h=await harness();await h.click('[data-company-ticket]');const form=h.document.querySelector('[data-company-reply-edit]');
+  form.elements.draftId.value='';form.elements.body.value='Independent staff revision';await h.emit('submit',form);
+  const record=h.document.querySelector('[data-company-edit-history] > details');
+  assert.equal(h.calls[0].payload.draftId,null);assert.match(record.querySelector(':scope > summary').textContent,/No linked draft/);assert.equal(record.querySelector(':scope > details'),null);
 });
 
 test('changing source selection clears pairing confirmation, copying sent mail retains its source',async()=>{
