@@ -102,3 +102,5 @@ The [backend API source](https://github.com/Yonge6/onelaser-workos-api) is maint
 ## Knowledge center / Wiki
 
 Knowledge center / Wiki embeds the complete existing [OneLaser knowledge center](https://yonge6.github.io/onelaser-support-center/), retaining its homepage, product families, full-text search, downloads, article navigation, images, sources and bilingual interface, with an original-site link. The source site and its publishing flow remain unchanged. Archive & review retains authenticated source snapshots and human review records. Shell theme and mobile navigation changes preserve the current Wiki page.
+
+Company deployments bundle a pinned, complete public version at `/wiki/`, retaining the original-site link. This avoids reliance on third-party frame navigation while preserving the original files and articles. Updates require a new reviewed pin; private support records are never bundled.

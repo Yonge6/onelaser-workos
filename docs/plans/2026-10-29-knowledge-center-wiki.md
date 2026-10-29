@@ -18,3 +18,7 @@
 ## Acceptance
 
 The original public site is not edited or replaced. All 236 source articles remain reachable through its full interface. Existing authenticated review records remain reachable separately. The Render page must show and run the complete Wiki rather than a flattened article list. Domain cutover stays pending the user's GoDaddy account recovery; this change works on either approved host.
+
+## Deployment follow-up
+
+Live Chrome verification reproduced blank cross-origin frames despite correct response headers and a working original-site link. Bundle the exact reviewed public support-center revision under same-origin `/wiki/`, retaining every source file and the original link. Parent iframe URL changes to `/wiki/?lang=zh|en`. The API build verifies Git blob hashes and serves only the fixed public artifact; private records remain in authenticated archive APIs. The same-origin document is trusted application code, not a security boundary, and only reviewed pins may be deployed. Scope framing headers to `/wiki/*` while preserving parent anti-framing headers.
