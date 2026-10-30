@@ -47,3 +47,18 @@ final result: passed
 - [x] Board Done remains separate from actual evidence acceptance.
 - [x] Seven-day boundary, reopening, child completion, cross-user/org access and stale writes tested.
 - [x] Mobile and both interface languages/themes checked.
+
+
+## 2026-10-30 shared workspace UI extension
+
+Result: local visual and regression checks passed; deployment acceptance is recorded separately.
+
+The user selected the task board as the system-wide source of truth. Shell and palette moved to `dist/workspace-ui.css`; the task board now inherits them instead of changing the whole shell only on its route. Legacy module styling remains as layout/behavior fallback; the shared stylesheet is loaded last.
+
+Checked all nine authenticated routes with a fictional local API: Executive, Overview, Tasks, OKRs, Reviews, Performance, Support, Wiki and Integrations. Desktop English light/dark: Figtree, 28px page title, 224px sidebar, 46px topbar, matching canvas/panels, no page overflow or visible app errors. Chinese mobile at 390x844: 24px title, 14px gutter, no page-level horizontal overflow. Fixed Wiki's legacy mobile column alignment so it starts at the same left gutter; hid redundant workspace breadcrumb text on mobile.
+
+Opened the actual task create modal, evidence drawer, support reply comparison and public Wiki assistant. Styles share blue primary controls, 4px form corners, 8px panels, and blue underline tabs. Preserved manager/employee actions, checkbox semantics, editor values, review rules and version history. No synthetic records were added to production and no customer replies or model jobs were submitted.
+
+Public Wiki checked without authentication: 236 guides, family imagery intact, three common guides per desktop row, article body retained at 16px/1.75 and mobile article free of overflow. Login/public shell uses the same stylesheet. Source text and download URLs were not rewritten.
+
+Artifacts: `qa/workspace-ui-20261030/`, including `desktop-checks.json`, `dark-checks.json`, `mobile-checks.json` and browser screenshots. Existing frontend suite: 138 passed, 1 optional skip. Shared CSS change does not require mirror-image unit tests; rendered layout and existing behavior suite are the acceptance evidence.

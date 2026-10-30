@@ -1,21 +1,25 @@
-# OneLaser Work OS brand UI
+# OneLaser Work OS shared UI
 
-Source verified 2026-10-28: OneLaser 网页 project, `UI-SPEC.md`, `AGENTS.md`, `src/home.css`, supplied `public/fonts/Certia-*.otf`. These are the user's website-project standards, not a claim that the commercial site has shipped every prototype change.
+Current source of truth (user decision 2026-10-30): the Monday-style task board. This supersedes the earlier website-scale Certia/red/pill UI for the internal system and its native/public Wiki. The official OneLaser wordmark remains unchanged.
 
-The Work OS demo, authenticated workspace, manager views and Bot authorization pages use Certia Regular 400, SemiBold 600 and ExtraBold 800. Chinese glyphs fall back to PingFang SC / Noto Sans CJK SC / Microsoft YaHei. Official English logo assets remain unchanged.
+All routes load `dist/workspace-ui.css` after legacy module styles. Task-board layout retains its dedicated stylesheet but inherits the same shared shell and tokens.
 
-| Role | Work OS rule |
+| Role | Current rule |
 |---|---|
-| Page title | 32 px, 800, 1.2 line height on desktop and mobile |
-| Entry card title | 28 px desktop / 24 px mobile, 800 |
-| Panel title | 20 px, 800 |
-| Body / introduction | 16 px, 1.6 line height |
-| Table cell / navigation / form value | 14 px; 600 for emphasis |
-| UI label | 13 px / 18 px, 600 |
-| Metadata / caption | minimum 12 px |
+| Font | Self-hosted Figtree variable 300–900; PingFang SC / Microsoft YaHei fallback |
+| Page title | 28px desktop / 24px mobile, 600 |
+| Section / card title | 18–20px / 16px, 500–600 |
+| UI body / table / navigation | 14px, regular; 500–600 for emphasis |
+| Description / metadata | 13px / 12px |
+| Technical article body | 16px, 1.75 line height; content preserved |
+| Primary action | #0073ea with white text; hover #0060b9 |
+| Controls | 34–36px high, 4px corners; row actions 30px |
+| Panels / dialogs | 8px corners; drawers square to window edge |
+| Tabs | Transparent surface, blue underline; no pills |
+| Shell | 224px sidebar, 46px topbar, 30px content gutter; 14px mobile gutter |
 
-Primary surface white, secondary #F5F5F7, text black, muted #6B6B70, border #D2D2D7. Brand #E7310E; action #D92D0D; pressed #BF260B. Night mode is a Work OS extension of the brand: #141414 page, #202023 panels, #F5F5F7 text, #B8B8BF muted, #444449 border. Red text is lightened for contrast; primary buttons retain white on action red. Semantic green/amber/error colors remain distinguishable.
+Light: white canvas/panels, #f6f7fb sidebar, #323338 text, #676879 muted, #d0d4e4 borders, #cce5ff selection. Dark: #181b34 canvas, #242944 sidebar, #31324e panels, #d5d6e2 text, #b2b4ca muted, #4c4e69 borders, #133774 selection. Links/focus use lighter blue in dark mode; filled actions retain #0073ea.
 
-Use 4 px spacing units, 8/12 px related-control gaps, 16/24 px content gaps, 24 px cards and 32 px modal corners. Pill primary actions are 52 px high; secondary actions 48 px; compact row actions 36 px; fields at least 44 px. Dense business tables do not copy 48–96 px marketing display type. Theme controls remain sun/moon icons; language stays 中 / EN.
+Status/priority/category labels retain the supplied task-board colors. Semantic success/warning/error states remain distinct. New styling does not change task, OKR, customer-response, evidence or authorization behavior. Done remains distinct from human acceptance.
 
-Fonts are same-origin files copied from the user's existing website assets, with swap display and Chinese fallbacks. Do not load fonts or CSS from third parties. Preserve functional keyboard focus, status semantics, responsive wrapping, and reduced motion. This change does not alter authentication, review permissions or demo/live data separation.
+Preserve visible keyboard focus, reduced motion, bilingual wrapping, complete logo assets, uncropped Wiki product images, three-column desktop common guides, and table-contained scrolling. Public Wiki remains public; internal data remains authenticated. No remote font/style dependencies.
