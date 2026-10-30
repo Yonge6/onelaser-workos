@@ -62,3 +62,39 @@ Opened the actual task create modal, evidence drawer, support reply comparison a
 Public Wiki checked without authentication: 236 guides, family imagery intact, three common guides per desktop row, article body retained at 16px/1.75 and mobile article free of overflow. Login/public shell uses the same stylesheet. Source text and download URLs were not rewritten.
 
 Artifacts: `qa/workspace-ui-20261030/`, including `desktop-checks.json`, `dark-checks.json`, `mobile-checks.json` and browser screenshots. Existing frontend suite: 138 passed, 1 optional skip. Shared CSS change does not require mirror-image unit tests; rendered layout and existing behavior suite are the acceptance evidence.
+
+## 2026-10-30 Monday team workflow extension
+
+final result: passed
+
+Source inspected read-only: OneLaser board `18437786001`, its member dialog, Add view menu, Dashboard `40234630`, and My Work table/calendar. The logged-in account exposes one Main workspace, one OneLaser board, and one invited owner. The user's KC screenshots remain the truth for five status labels, priorities, categories, nesting and colors. Access to the private KC board was not available and is not claimed.
+
+Evidence directory: `qa/monday-team-20261030/` (local-only QA assets).
+- Source: `08-source-board-final.png`, `02-source-members.png`, `03-source-views.png`, `04-source-team-dashboard.png`, `05-source-my-work.png`, `06-source-calendar.png`.
+- Implementation: `20-local-table-final.png`, `13-local-my-work.png`, `21-local-dashboard-postfix.png`, `22-local-calendar-postfix.png`, `15-local-members.png`, `12-local-kanban.png`, `17-local-mobile-dark.png`, `18-local-mobile-table.png`.
+- Combined visual inputs actually opened: `compare-board-focused.png`, `compare-my-work.png`, `compare-dashboard-postfix.png`, `compare-calendar-postfix.png`; earlier iterations `compare-dashboard.png` and `compare-calendar.png` retained.
+- Source and implementation desktop images are1352×822, CSS viewport1352×822, browser-normalized1× capture. Focused board comparison removes the different app navigation; source cropx350/y90 and implementationx224/y46. Source KC screenshot density/color normalization remains documented above. Mobile actual viewport390×844. No device-frame comparison.
+
+Comparison history:
+1. P2: first My Work repeated all team columns and summary bars, unlike the source's Group/Board/People/Date/Status organization. Fixed with a distinct personal table, original group/board references, and collapsed empty date buckets. Recaptured `13-local-my-work.png` and reviewed combined `compare-my-work.png`.
+2. P2: first reporting used left-aligned short KPI cards and horizontal owner bars; source uses centered tall KPI cards and vertical bars. Fixed card header separators, centered values and vertical bars. Post-fix combined `compare-dashboard-postfix.png` opened and reviewed.
+3. P2: initial125px calendar rows hid the current-date row below the first viewport and used verbose navigation. Reduced rows to92px, aligned navigation/date positions, used purple due-date cards and blue today marker. Post-fix `compare-calendar-postfix.png` opened and reviewed.
+4. P2 interaction: discussion drawer needed keyboard focus management and misleading Hide/Group controls appeared in views that did not use them. Added initial focus, Tab containment, Escape close/focus return; removed irrelevant controls. Small-width group count now stays on one line.
+
+Fidelity surfaces:
+- Typography: locally bundled Figtree,14px dense table/toolbar,28px main title,18px reporting titles and36px KPI values. Chinese system fallback retained. Long task names truncate only within table cells; full names remain in details/update drawer.
+- Layout: same dense rows, grid separators, blue underline tabs, colored group spines, nested subitems and cell labels. Added separate Team board/My Work scopes, functional Table/Kanban/Calendar/Dashboard. Dates and original board/group are visible in My Work. Horizontal table/Kanban scrolling stays inside their own containers; task/check columns remain pinned on desktop, scrolling is free on mobile.
+- Colors: the existing KC-derived status/priority/category palette is preserved in light and dark. Blue actions and selected states share production tokens; reporting uses those actual states. Calendar due-date cards use source purple. Dashboard actual data has five states instead of the source demo's three; this is intentional data/config variation.
+- Assets/icons: official OneLaser logo, real Figtree and Phosphor assets. No imitation Monday logo or screenshot-as-UI. Pie/bar charts are live data visualizations, not decorative image substitutes.
+- Copy: bilingual operational labels; real people names come only from the authorized directory. No copied source task content or private KC records. Internal updates explicitly explain no customer sending/notifications/acceptance.
+
+Functional/browser acceptance:
+- Local fictional manager/team data only, no production records seeded. Actual UI task drag moved a card Working→On-Hold and saved the versioned API state; status menu remains keyboard alternative.
+- Owner filter reduced all team widgets consistently. My Work showed only three tasks owned by the current manager, correctly split Past Dates/Today/This week. New task from My Work selects the current owner.
+- Month navigation, Today, show/hide weekends, private scope/view persistence, board people dialog checked. People dialog describes real department/assigned scope and does not grant access.
+- Internal update posted through the real API, author/date/text and count visibly returned. Evidence is a separate existing action. Draft/error/idempotency/XSS and cross-org/department/owner restrictions covered by tests.
+- Light/dark desktop and390px mobile checked. Mobile navigation overlay closes by selecting a page; closed state has no document overflow. Tables intentionally scroll horizontally.
+
+Intentional product boundaries: retain the OneLaser system sidebar and existing department/owner authorization, not Monday's marketplace/navigation/billing. One department board exists per authorized scope; no new multi-board membership, invitations, Gantt, Docs, Forms, file upload, rich-text mentions or notification delivery were added. The first source Updates capture had an unloaded pane and was rejected as visual truth. Kanban is functional based on the exposed view type, not a claimed pixel audit of an inaccessible source Kanban view. Exact whole-product identity is not claimed.
+
+No actionable P0/P1/P2 findings remain for this core team-task scope. P3: rich-text discussion tools, chart axes and independently named multiple boards can be separate future expansions; no fake controls for them are shipped. Production deployment proof is recorded in the private acceptance handoff.
