@@ -14,6 +14,10 @@ The interface, validation messages, sample tasks, objectives, review explanation
 
 The brand area uses the original English OneLaser SVG wordmark and the fixed English subtitle `Work OS`. Light and dark themes use the original black and white variants at their full aspect ratio. Dark styling covers tables, boards, forms, drawers, dialogs, reminders and empty states without applying a global image inversion.
 
+## Hover help for new users
+
+`dist/help-tips.js` adds bilingual hover hints (purpose + how to use) to the main controls. A **?** icon beside each page title explains the whole page, and the **?** button in the top bar turns button hints on or off (saved in this browser). The layer is read-only: no requests, no business data changes. To add or edit a hint, add an entry keyed on `data-*` attributes in `RULES` / `PAGES`, then run `npm test`.
+
 ## Server-backed company mode
 
 The same frontend has two explicitly separate modes. GitHub Pages defaults to `demo` and fictional samples. Company deployments use `live`, reading and saving business records through the same-origin API. Live mode has no identity switcher, never imports demo browser storage, and does not fall back to fictional data when the service is unavailable.
