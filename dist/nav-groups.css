@@ -1,0 +1,16 @@
+/* Sidebar hierarchy: each section is a block with a coloured header and indented items */
+.nav-group{--sec:#579bfc;margin:10px 0 4px}
+.nav-group:first-child{margin-top:0}
+.nav-group-work{--sec:#579bfc}.nav-group-reports{--sec:#a25ddc}.nav-group-product{--sec:#00c875}.nav-group-labs{--sec:#fdab3d}.nav-group-other{--sec:#9699a6}
+.nav-group>.nav-section{display:flex;align-items:center;gap:8px;width:100%;margin:0;padding:7px 10px;border:0;border-radius:8px;background:color-mix(in srgb,var(--sec) 12%,transparent);color:inherit;font-size:12.5px;font-weight:700;letter-spacing:.04em;cursor:pointer;text-align:left;text-transform:none}
+.nav-group>.nav-section:hover{background:color-mix(in srgb,var(--sec) 20%,transparent)}
+.nav-sec-dot{width:8px;height:8px;border-radius:50%;background:var(--sec);box-shadow:0 0 0 3px color-mix(in srgb,var(--sec) 25%,transparent);flex:0 0 auto}
+.nav-sec-name{flex:1;color:var(--sec);filter:brightness(1.05)}
+html:not([data-theme=dark]) .nav-sec-name{filter:brightness(.8)}
+.nav-sec-count{font-size:11px;font-weight:600;opacity:.6}
+.nav-sec-caret{font-size:11px;opacity:.6;width:10px;text-align:center}
+.nav-group-items{margin:4px 0 0 7px;padding-left:5px;border-left:2px solid color-mix(in srgb,var(--sec) 35%,transparent)}
+.nav-group.closed .nav-group-items{display:none}
+.nav-group-items .nav-item{margin:1px 0}
+.nav-group-items .nav-item.active{box-shadow:inset 3px 0 0 var(--sec)}
+.nav-group-items .nav-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nav-group-items .nav-item .nav-test{flex:0 0 auto;writing-mode:horizontal-tb;padding:1px 5px;font-size:10.5px}
