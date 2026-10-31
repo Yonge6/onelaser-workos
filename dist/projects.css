@@ -244,3 +244,4 @@ html[data-theme=dark] .pj-inbox{border-color:#2e3a55;background:#1f2533}
 .pj-inbox-list{display:flex;flex-direction:column;gap:2px;padding:0 8px 8px}
 .pj-inbox .pj-my-row{background:var(--pj-card,#fff)}
 html[data-theme=dark] .pj-inbox .pj-my-row{background:#2a2a2f}
+.pj-sample{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;color:#7a4f00;background:#fff1d6;border-radius:8px;padding:5px 10px}html[data-theme=dark] .pj-sample{background:#3d3220;color:#f0c674}
