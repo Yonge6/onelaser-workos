@@ -57,7 +57,7 @@
   function notice(text, style = '') { return `<div class="notice ${style}">${icon('shield')}<span>${text}</span></div>`; }
   function toast(text) { const target = document.getElementById('toast'); target.textContent = text; target.classList.add('show'); setTimeout(() => target.classList.remove('show'), 4000); }
   function explainError(error) { if (error?.code?.startsWith('BOT_')) return jobError(error.code); if (error?.status === 409) return tr('记录已被更新。请关闭当前表单、刷新记录后重新确认。','This record changed. Close the form, refresh it and confirm the current version.'); return error?.message || tr('请求未完成，请稍后重试。','The request could not be completed. Try again later.'); }
-  function clearPrivateData() { const hadActor=!!state.actor; window.CompanySupport?.reset(); window.WorkOSTaskBoard?.reset(); if(hadActor)window.WikiAssistant?.reset(); state.actor = null; state.executive = null; state.tasks = []; state.objectives = []; state.okrOwner = null; state.krs = []; state.appraisals = {}; state.directory = []; state.audit = []; state.details.clear(); openTaskId = null; api?.clearSession(); closeOverlay(); }
+  function clearPrivateData() { const hadActor=!!state.actor; window.CompanySupport?.reset(); window.WorkOSTaskBoard?.reset(); window.WorkOSOkrBoard?.reset(); if(hadActor)window.WikiAssistant?.reset(); state.actor = null; state.executive = null; state.tasks = []; state.objectives = []; state.okrOwner = null; state.krs = []; state.appraisals = {}; state.directory = []; state.audit = []; state.details.clear(); openTaskId = null; api?.clearSession(); closeOverlay(); }
   function handleAuthError(error) { if (error?.status === 401) { clearPrivateData(); state.error = tr('登录已过期，请重新使用钉钉登录。','Your session expired. Sign in with DingTalk again.'); render(); return true; } return false; }
   function renderLogin() {
     const ready = state.capabilities.auth?.loginEnabled ?? configured(state.capabilities.dingtalk);
@@ -69,6 +69,7 @@
     const publicView=!state.actor&&publicKnowledgeRoute(),wikiActive=state.page==='knowledge'&&!/^#knowledge\/archive(?:[/?]|$)/.test(window.location.hash||'')&&(!!state.actor||publicView);
     window.WorkOSWiki?.configure({language:i18n.lang,changed:render,active:wikiActive,canViewArchive:!!state.actor});
     if(state.actor)window.WorkOSTaskBoard?.configure({api,actor:state.actor,directory:state.directory,language:i18n.lang,toast,newTask,openTask,onTasksChanged:items=>{state.tasks=items;}});
+    if(state.actor)window.WorkOSOkrBoard?.configure({api,state:()=>state,lang:()=>i18n.lang,rerender:render,refreshOkr,toast,explainError,overlay,closeOverlay,modal,openAppraisal,measurement,openObjectiveSource});
     if(state.actor)window.CompanySupport?.configure({api,actor:state.actor,language:i18n.lang,changed:render,showModal:modal,active:state.page==='knowledge',view:state.page});
     window.WikiAssistant?.configure({language:i18n.lang,active:wikiActive,apiBase:window.WORKOS_CONFIG.apiBase||'/api'});
     document.documentElement.lang = i18n.lang === 'en' ? 'en' : 'zh-CN';
@@ -93,6 +94,7 @@
   function board(tasks) { return `<div class="kanban">${[['planned','doing'],['blocked'],['submitted','revision'],['accepted']].map((statuses,index) => `<div class="kanban-col"><div class="kanban-title"><strong>${[tr('计划与执行','Plan & execution'),tr('等待协调','Needs coordination'),tr('成果待验收','Awaiting review'),tr('已验收','Accepted')][index]}</strong><small>${tasks.filter(task => statuses.includes(task.status)).length}</small></div>${tasks.filter(task => statuses.includes(task.status)).map(task => `<button class="kanban-card" data-live-task="${esc(task.id)}">${badge(task.status)}<h3>${esc(task.title)}</h3><div class="kanban-meta"><span>${esc(displayName(task.owner_id))}</span><span>${date(task.due_at)}</span></div></button>`).join('')}</div>`).join('')}</div>`; }
   function canEditObjective(objective) { return objective.level !== 'company' && (manager() || objective.owner_id === state.actor.id); }
   function okrPage() {
+    if(window.WorkOSOkrBoard)return window.WorkOSOkrBoard.render();
     const O=window.WorkOSOkr;
     const owners=[...new Set(state.objectives.map(o=>o.owner_id))].sort((a,b)=>displayName(a).localeCompare(displayName(b)));
     if(state.okrOwner!=='*'&&!owners.includes(state.okrOwner))state.okrOwner=owners.includes(state.actor.id)?state.actor.id:owners[0]||null;
@@ -221,6 +223,14 @@
     overlay(body,true); openTaskId = task.id;
   }
   async function notificationPreview() { const result = await api.get('/notifications/preview'); notificationKey = crypto.randomUUID(); modal(tr('提醒预览','Reminder preview'), `<p class="fine">${tr('当前尚未发送。选定任务后，由负责人确认发送。','Nothing has been sent. A manager must confirm the selected tasks.')}</p><form id="live-send-notifications">${(result.items || []).map(task => `<label class="form-check"><input name="taskId" type="checkbox" value="${esc(task.id)}"><span>${esc(task.title)}<br><small>${esc(displayName(task.owner_id))} · ${date(task.due_at)}</small></span></label>`).join('') || empty(tr('暂无待提醒任务','No tasks need a reminder'))}</form>`,manager() ? submitButton('live-send-notifications',tr('确认发送选定提醒','Send selected reminders')) : ''); }
+  async function refreshOkr() {
+    const [objectives, krs] = await Promise.all([api.get('/objectives'),api.get('/key-results')]);
+    state.objectives = objectives.items || []; state.krs = krs.items || [];
+    const reviewable=state.krs.filter(k=>k.department_id===state.actor.department_id&&(manager()||k.owner_id===state.actor.id));
+    const appraisals=await Promise.allSettled(reviewable.map(k=>api.get('/key-results/'+encodeURIComponent(k.id)+'/appraisal')));
+    state.appraisals={};appraisals.forEach((result,i)=>{if(result.status==='fulfilled')state.appraisals[reviewable[i].id]=result.value;});
+    window.WorkOSOkrBoard?.refreshed();
+  }
   async function refreshData() {
     const [tasks, objectives, krs, directory] = await Promise.all([api.get('/tasks'),api.get('/objectives'),api.get('/key-results'),api.get('/directory')]);
     state.tasks = tasks.items || []; state.objectives = objectives.items || []; state.krs = krs.items || []; state.directory = directory.items || [];
