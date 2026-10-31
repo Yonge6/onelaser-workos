@@ -44,6 +44,11 @@ test('without cost access only SKU and retail price are shown; with it the lowes
   assert.doesNotMatch(basic.window.WorkOSProducts.render('catalog'), /工厂价 ¥/, 'catalog hides factory price without cost access');
   const full = load(['products.js'], baseState({ id:'u1', display_name:'KC', grants:['products', 'product_cost_detail'] }));
   const fhtml = full.window.WorkOSProducts.render('cost');
+  const cat = full.window.WorkOSProducts.render('catalog');
+  assert.match(cat, /零售价 MSRP/); assert.doesNotMatch(cat, /最低价|工厂价|经销|折扣|结账运费|DDP 单价|成本/, 'catalog shows no price other than MSRP, even for people with cost access');
+  full.window.WorkOSProducts._ui.product = 'DEMO-HYD-60';
+  assert.doesNotMatch(full.window.WorkOSProducts.render('catalog'), /最低售价|工厂价|结账运费|最终成本|DDP 单价|美国尾程/, 'product editor shows MSRP only');
+  full.window.WorkOSProducts._ui.product = null;
   for (const t of ['最低成本', '分销价', '成本构成', '折扣力度 1', '折扣力度 2', '折扣力度 3', '经销商售价', '清货最低价', '利润率']) assert.match(fhtml, new RegExp(t), t);
 });
 
