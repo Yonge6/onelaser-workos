@@ -19,40 +19,43 @@ function load(files, state) {
 }
 const baseState = (actor, extra = {}) => ({ actor, capabilities:{ orgProfiles:true }, directory:[actor], tasks:[], objectives:[], krs:[], page:'overview', ...extra });
 
-test('sidebar has the four sections in the requested order, and restricted pages are gated', () => {
+test('sidebar sections follow the requested order, and restricted pages are gated', () => {
   const block = live.match(/const navs = \[([\s\S]*?)\];/)[1];
   const order = [...block.matchAll(/\['([a-z-]+)','[a-z]+','([^']+)','[^']+','([a-z]+)'\]/g)].map(m => [m[1], m[2], m[3]]);
   const ids = s => order.filter(o => o[2] === s).map(o => o[0]);
-  assert.deepEqual(ids('work'), ['okr', 'projects', 'tasks']);
-  assert.deepEqual(ids('reports'), ['overview', 'team', 'project-analysis']);
-  assert.deepEqual(ids('labs'), ['support', 'knowledge', 'executive', 'products']);
-  assert.deepEqual(ids('other'), ['integrations', 'settings', 'org']);
-  assert.match(live, /products:!!window\.WorkOSProducts && \(state\.actor\?\.grants\|\|\[\]\)\.includes\('products'\)/);
+  assert.deepEqual(ids('work'), ['overview', 'okr', 'projects', 'tasks'], 'workbench is the first page of the Workspace');
+  assert.deepEqual(ids('reports'), ['okr-analysis', 'project-analysis', 'team']);
+  assert.deepEqual(ids('product'), ['products', 'product-cost', 'supply-chain'], 'product hub is its own section with three modules');
+  assert.deepEqual(ids('labs'), ['support', 'knowledge', 'quality']);
+  assert.deepEqual(ids('other'), ['settings', 'orgchart', 'org']);
+  assert.ok(ids('hidden').includes('executive') && ids('hidden').includes('integrations'), 'executive board removed; integrations moved into settings');
+  assert.match(live, /const productAccess = \(\) => !!window\.WorkOSProducts && \(state\.actor\?\.grants\|\|\[\]\)\.includes\('products'\)/);
+  assert.match(live, /products:productAccess\(\), 'product-cost':productAccess\(\), 'supply-chain':productAccess\(\)/);
   assert.match(live, /org:!!window\.WorkOSPeople && state\.actor\?\.isAdmin===true/);
-  assert.match(live, /products: \(\) => window\.WorkOSProducts && \(state\.actor\.grants\|\|\[\]\)\.includes\('products'\)/, 'direct URL is gated too');
+  for (const id of ['products', 'product-cost', 'supply-chain']) assert.match(live, new RegExp(`'?${id}'?: \\(\\) => productAccess\\(\\) \\?`), `direct URL for ${id} is gated too`);
+  assert.match(live, /function integrationPage\(\) \{ return state\.actor\?\.isAdmin===true/, 'integrations page is admin-only');
 });
 
-test('cost breakdown is shown only with product_cost_detail; final cost is always shown', () => {
+test('without cost access only SKU and retail price are shown; with it the lowest cost, dealer price and price ladder', () => {
   const basic = load(['products.js'], baseState({ id:'u2', display_name:'Yong', grants:['products'] }));
-  basic.window.WorkOSProducts._ui.tab = 'cost';
-  const html = basic.window.WorkOSProducts.render();
-  assert.match(html, /最终成本/);
-  assert.doesNotMatch(html, /成本构成|出厂价|到岸成本|毛利率/);
+  const html = basic.window.WorkOSProducts.render('cost');
+  assert.match(html, /DEMO-HYD-60/); assert.match(html, /零售价[\s\S]*\$4,999\.00/);
+  assert.doesNotMatch(html, /最低成本|分销价 |经销商售价|成本构成|工厂价|净利润|利润率/);
+  assert.doesNotMatch(basic.window.WorkOSProducts.render('catalog'), /工厂价 ¥/, 'catalog hides factory price without cost access');
   const full = load(['products.js'], baseState({ id:'u1', display_name:'KC', grants:['products', 'product_cost_detail'] }));
-  full.window.WorkOSProducts._ui.tab = 'cost';
-  const fhtml = full.window.WorkOSProducts.render();
-  assert.match(fhtml, /成本构成/); assert.match(fhtml, /出厂价/); assert.match(fhtml, /毛利率/);
+  const fhtml = full.window.WorkOSProducts.render('cost');
+  for (const t of ['最低成本', '分销价', '成本构成', '折扣力度 1', '折扣力度 2', '折扣力度 3', '经销商售价', '清货最低价', '利润率']) assert.match(fhtml, new RegExp(t), t);
 });
 
-test('cost model adds up and replenishment rounds to MOQ', () => {
+test('cost model follows the SKU sheet and the price ladder is consistent', () => {
   const { window } = load(['products.js'], baseState({ id:'u1', display_name:'KC', grants:['products', 'product_cost_detail'] }));
-  const D = window.WorkOSProducts._data, p = D.products.find(x => x.sku === 'XRF-100'), c = D.cost(p);
-  const sum = c.lines.reduce((s, l) => s + l[2], 0) + c.fulfil.reduce((s, l) => s + l[2], 0);
-  assert.ok(Math.abs(sum - c.total) < 1e-9);
-  const s = D.supply(p);
-  assert.equal(s.qty % p.moq, 0);
-  assert.equal(s.qty, 10); // 0.25/day × (65 lead + 14 safety + 45 cover) − 21 pipeline = 10 → MOQ 5
-  assert.equal(s.state, 'stockout');
+  const D = window.WorkOSProducts._data, p = D.products.find(x => x.sku === 'DEMO-COB-40'), c = D.cost(p, 'msrp');
+  assert.equal(c.vol, 95 * 65 * 40 / 6000);
+  assert.ok(Math.abs(c.productUsd - 7200 * 1.03 / 7) < 1e-9, 'factory RMB × export markup ÷ FX');
+  assert.ok(Math.abs(c.total - (c.hard + c.opexTotal)) < 1e-9);
+  assert.ok(Math.abs(c.profit - (p.msrp + p.shipFee - c.total)) < 1e-9);
+  assert.ok(Math.abs(c.minCost - (c.productUsd + Math.min(c.ddp, c.hybrid))) < 1e-9, 'lowest cost uses the cheaper freight');
+  assert.ok(Math.abs(c.opex.reduce((n, x) => n + x[2], 0) - c.opexTotal) < 1e-6, 'operating breakdown sums to 38%');
 });
 
 test('team analysis empty state explains reporting lines; workbench lists items needing attention', () => {

@@ -233,3 +233,14 @@ html[data-theme=dark] .pj-sync{background:#1c3a2e;color:#7fdcb0}
 .pj-risk b{font-size:14px}.pj-risk.bad{background:#fde8eb;color:#c8243f}.pj-risk.warn{background:#fff3dc;color:#b06d00}.pj-risk.ok{background:#e3f8ee;color:#00855a}
 html[data-theme=dark] .pj-risk.bad{background:#4a2026;color:#ff9aa8}html[data-theme=dark] .pj-risk.warn{background:#463619;color:#f5c26b}html[data-theme=dark] .pj-risk.ok{background:#1c3a2e;color:#7fdcb0}
 .pj-an-list{list-style:none;margin:0;padding:0}.pj-an-list li{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--pj-line);font-size:13px}.pj-an-list li:first-child{border-top:0}.pj-an-list .pj-tlink{flex:1}
+
+/* Task hub inbox: project tasks assigned to me */
+.pj-inbox{margin:0 0 14px;border:1px solid #d7e3ff;background:#f5f8ff;border-radius:12px;overflow:hidden}
+html[data-theme=dark] .pj-inbox{border-color:#2e3a55;background:#1f2533}
+.pj-inbox-head{display:flex;align-items:center;gap:8px;width:100%;border:0;background:none;padding:10px 14px;cursor:pointer;color:inherit;font:inherit;text-align:left}
+.pj-inbox-head span{background:#579bfc;color:#fff;border-radius:10px;padding:0 8px;font-size:12px;font-weight:600}
+.pj-inbox-head em{font-style:normal;color:#e2445c;font-size:12px;font-weight:600}
+.pj-inbox-head small{flex:1;color:#8c9196;font-size:12px}
+.pj-inbox-list{display:flex;flex-direction:column;gap:2px;padding:0 8px 8px}
+.pj-inbox .pj-my-row{background:var(--pj-card,#fff)}
+html[data-theme=dark] .pj-inbox .pj-my-row{background:#2a2a2f}

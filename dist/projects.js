@@ -269,6 +269,7 @@
     const totalTasks = rows.reduce((s, r) => s + r.ts.length, 0), totalDone = rows.reduce((s, r) => s + r.done, 0), totalOd = rows.reduce((s, r) => s + r.od.length, 0);
     return `<div class="pj">
       <div class="page-heading"><div><div class="eyebrow">WORK OS · REPORTS</div><h1>${tr('项目分析', 'Project analysis')}</h1><p>${tr('每个项目的进展、是否按时，以及延期的可能性。', 'Progress, timeliness and delay risk for every project.')}</p></div></div>
+      ${window.WorkOSInsights?.slot('project') || ''}
       <div class="pj-proto">${icon('flask')} ${tr('使用项目管理原型数据；项目管理接入后台后自动换成真实数据', 'Uses project prototype data; switches to real data once projects are connected')}</div>
       <div class="pj-an-stats">
         <div><span>${tr('进行中的项目', 'Active projects')}</span><strong>${rows.length}</strong></div>
@@ -303,6 +304,7 @@
     const task = tasks.find(x => x.id === id);
     switch (a) {
       case 'go-home': ui.project = null; ui.view = 'home'; return rerender();
+      case 'inbox-toggle': ui.inboxOpen = ui.inboxOpen === false; return rerender();
       case 'go-my': ui.project = null; ui.view = 'my'; return rerender();
       case 'filter': ui.filter = t.dataset.v; return rerender();
       case 'open-project': ui.project = id; ui.tab = 'list'; if (t.dataset.goto && ctx.state().page !== 'projects') { window.location.hash = 'projects'; return; } return rerender();
@@ -330,5 +332,14 @@
       ctx.closeOverlay(); ui.project = id; ui.tab = 'list'; ctx.toast(tr('项目已创建，按阶段添加任务吧', 'Project created — add tasks by stage')); return rerender(); }
   });
 
-  window.WorkOSProjects = { configure(next) { ctx = next; }, render, analysis, _data:{ projects, tasks }, _ui:ui };
+  /* Task hub inbox: every open project task assigned to me shows up in the Task hub automatically. */
+  function taskInbox() {
+    if (!ctx) return '';
+    const mine = tasks.filter(t => t.owner === me() && t.status !== 'done').sort((a, b) => a.due.localeCompare(b.due));
+    if (!mine.length) return '';
+    const late = mine.filter(overdue).length;
+    return `<section class="pj-inbox ${ui.inboxOpen === false ? 'closed' : ''}"><button class="pj-inbox-head" data-pj="inbox-toggle">${icon('folder-simple')} <strong>${tr('来自项目管理的任务', 'From Projects')}</strong><span>${mine.length}</span>${late ? `<em>${late} ${tr('项逾期', 'overdue')}</em>` : ''}<small>${tr('项目里分派给你的任务会自动出现在这里', 'Project tasks assigned to you appear here automatically')}</small>${icon(ui.inboxOpen === false ? 'caret-down' : 'caret-up')}</button>
+      ${ui.inboxOpen === false ? '' : `<div class="pj-inbox-list">${mine.map(t => { const p = proj(t.project); return `<button class="pj-my-row pj-inbox-row" data-pj="open-task" data-id="${t.id}"><span class="pj-check"></span><span class="pj-my-title">${esc(L(t.title))}</span><span class="pj-tag" style="--c:${p.color}">${esc(L(p.name))}</span>${pill(STATUS, t.status, 'small')}<span class="pj-due ${overdue(t) ? 'late' : ''}">${fmt(t.due)}</span></button>`; }).join('')}</div>`}</section>`;
+  }
+  window.WorkOSProjects = { configure(next) { ctx = next; }, render, analysis, taskInbox, _data:{ projects, tasks }, _ui:ui };
 })();

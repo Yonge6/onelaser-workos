@@ -6,7 +6,7 @@
 (() => {
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   let ctx = null;
-  const ui = { team:null, teamLoading:false, teamError:'', teamScope:'reports', teamOpen:new Set(), org:null, orgLoading:false, orgError:'', orgView:'table', saving:false, profileMsg:'' };
+  const ui = { team:null, teamLoading:false, teamError:'', teamScope:'reports', teamOpen:new Set(), org:null, orgLoading:false, orgError:'', orgView:'table', chart:null, chartLoading:false, chartError:'', chartCollapsed:new Set(), chartLoc:'', saving:false, profileMsg:'' };
   const S = () => ctx.state();
   const lang = () => ctx.lang() === 'en' ? 'en' : 'zh';
   const tr = (zh, en) => lang() === 'en' ? en : zh;
@@ -91,16 +91,16 @@
     finally { ui.teamLoading = false; if (S().page === 'team') ctx.rerender(); }
   }
   function team() {
-    if (!caps()) return `<div class="pp">${heading(tr('团队任务分析', 'Team analysis'), tr('需要后台升级（汇报线功能）后才能使用。', 'Requires the backend upgrade with reporting lines.'))}</div>`;
+    if (!caps()) return `<div class="pp">${heading(tr('任务分析', 'Task analysis'), tr('需要后台升级（汇报线功能）后才能使用。', 'Requires the backend upgrade with reporting lines.'))}</div>`;
     if (!ui.team && !ui.teamLoading && !ui.teamError) { loadTeam(); }
     const d = ui.team, t = d?.totals;
     const scopeSwitch = d?.canViewAll ? `<div class="pp-seg"><button class="${ui.teamScope === 'reports' ? 'active' : ''}" data-pp="scope" data-v="reports">${tr('我的下属', 'My reports')}</button><button class="${ui.teamScope === 'all' ? 'active' : ''}" data-pp="scope" data-v="all">${tr('全公司', 'Whole company')}</button></div>` : '';
-    const head = heading(tr('团队任务分析', 'Team analysis'), tr('按汇报线汇总：所有直接和间接向你汇报的同事的任务完成情况。', 'Task outcomes for everyone who reports to you, directly or indirectly.'), `${scopeSwitch}<button class="btn" data-pp="reload-team">${icon('arrows-clockwise')} ${tr('刷新', 'Refresh')}</button>`);
+    const head = heading(tr('任务分析', 'Task analysis'), tr('按汇报线汇总：所有直接和间接向你汇报的同事的任务完成度、准时率和逾期情况。', 'Task completion, on-time rate and overdue work for everyone who reports to you, directly or indirectly.'), `${scopeSwitch}<button class="btn" data-pp="reload-team">${icon('arrows-clockwise')} ${tr('刷新', 'Refresh')}</button>`);
     if (ui.teamLoading && !d) return `<div class="pp">${head}<p class="pp-hint">${tr('正在读取…', 'Loading…')}</p></div>`;
     if (ui.teamError) return `<div class="pp">${head}<div class="pp-alert">${esc(ui.teamError)}</div></div>`;
     if (!d.members.length) return `<div class="pp">${head}<div class="pp-empty big">${icon('tree-structure')}<h3>${tr('还没有人向你汇报', 'No one reports to you yet')}</h3><p>${tr('汇报线由管理员在“组织与权限”里设置。设置后，这里会显示团队成员的任务完成度、准时率和逾期情况。', 'Reporting lines are set by an administrator in Organization & permissions. Then this page shows completion, on-time rate and overdue work for your team.')}</p>${me().isAdmin ? `<button class="btn primary" data-live-page="org">${tr('去设置汇报线', 'Set reporting lines')}</button>` : ''}</div></div>`;
     const sorted = [...d.members].sort((a, b) => (b.stats.overdue - a.stats.overdue) || ((a.stats.completionRate ?? 101) - (b.stats.completionRate ?? 101)));
-    return `<div class="pp">${head}
+    return `<div class="pp">${head}${window.WorkOSInsights?.slot('task') || ''}
       <div class="pp-stats">
         ${stat(tr('团队人数', 'People'), d.members.length, d.scope === 'all' ? tr('全公司', 'Whole company') : tr('直接 + 间接下属', 'Direct + indirect'))}
         ${stat(tr('任务完成度', 'Completion'), t.completionRate === null ? '—' : t.completionRate + '%', `${t.accepted}/${t.total} ${tr('已验收', 'accepted')}`)}
@@ -153,10 +153,10 @@
             <dt>${tr('老板看板', 'Executive overview')}</dt><dd>${yes(a.executiveAccess)}</dd>
             <dt>${tr('客服工作台', 'Support workspace')}</dt><dd>${yes(a.supportAccess?.read)}</dd>
             <dt>${tr('产品管理区', 'Product hub')}</dt><dd>${yes(grants.includes('products'))}</dd>
-            <dt>${tr('成本计算明细', 'Cost breakdown')}</dt><dd>${yes(grants.includes('product_cost_detail'))}</dd></dl>
+            <dt>${tr('看成本', 'Cost access')}</dt><dd>${yes(grants.includes('product_cost_detail'))}</dd></dl>
           <p class="pp-hint">${tr('权限由管理员在“组织与权限”中设置。', 'Access is set by an administrator in Organization & permissions.')}</p>
         </section>
-      </div></div>`;
+      </div>${(() => { const body = ctx.integrations?.(); return body ? `<section class="pp-panel pp-admin-int"><div class="pp-panel-head"><h2>${icon('plugs-connected')} ${tr('集成与通知（仅系统管理员可见）', 'Integrations & notifications (administrators only)')}</h2></div>${body}</section>` : ''; })()}</div>`;
   }
   function resizeImage(file) {
     return new Promise((resolve, reject) => {
@@ -176,7 +176,7 @@
   function org() {
     if (!caps()) return `<div class="pp">${heading(tr('组织与权限', 'Organization & permissions'), tr('需要后台升级后才能使用。', 'Requires the backend upgrade.'))}</div>`;
     if (!ui.org && !ui.orgLoading && !ui.orgError) loadOrg();
-    const head = heading(tr('组织与权限', 'Organization & permissions'), tr('设置每个人的直属上级、职位、角色和功能权限。汇报线决定谁能在“团队任务分析”里看到谁。', 'Set each person’s manager, title, role and feature access. Reporting lines decide who sees whom in Team analysis.'),
+    const head = heading(tr('组织与权限', 'Organization & permissions'), tr('设置每个人的直属上级、职位、角色和功能权限。汇报线决定谁能在“任务分析”里看到谁。', 'Set each person’s manager, title, role and feature access. Reporting lines decide who sees whom in Task analysis.'),
       `<div class="pp-seg"><button class="${ui.orgView === 'table' ? 'active' : ''}" data-pp="org-view" data-v="table">${icon('table')} ${tr('成员与权限', 'Members & access')}</button><button class="${ui.orgView === 'chart' ? 'active' : ''}" data-pp="org-view" data-v="chart">${icon('tree-structure')} ${tr('汇报线图', 'Org chart')}</button></div>`);
     if (ui.orgError) return `<div class="pp">${head}<div class="pp-alert">${esc(ui.orgError)}</div></div>`;
     if (!ui.org) return `<div class="pp">${head}<p class="pp-hint">${tr('正在读取…', 'Loading…')}</p></div>`;
@@ -198,12 +198,41 @@
       <p>${icon('lock-simple')} ${tr('“产品管理区”只给需要的人开通；“成本明细”可以看到价格的计算过程，开通前请确认。老板看板和客服工作台目前由部署配置管理。', 'Grant Product hub only to those who need it; Cost detail reveals how prices are calculated. Executive and Support access are currently managed in deployment config.')}</p></div>
     </div>`;
   }
+  /* ---------- org chart (everyone): name, title, location ---------- */
+  const LOC_COLORS = ['#579bfc', '#00c875', '#fdab3d', '#a25ddc', '#e2445c', '#00a9a5', '#ff7575', '#9d50dd'];
+  const locKey = u => String(u.location || '').trim();
+  // Country flag from a free-text location (city, state or country, Chinese or English).
+  const FLAGS = [[/中国|china|prc|深圳|东莞|武汉|济南|聊城|上海|北京|广州|杭州|苏州|宁波|厦门|成都|重庆|天津|西安|南京|长沙|郑州|青岛|佛山|中山|惠州/i, '🇨🇳'], [/香港|hong kong/i, '🇭🇰'], [/台湾|taiwan|台北/i, '🇹🇼'],
+    [/美国|usa|united states|\bus\b|california|\bca\b|texas|\btx\b|new york|\bny\b|florida|washington|irvine|los angeles|lake forest|san|seattle|chicago|boston|nevada|las vegas/i, '🇺🇸'], [/加拿大|canada|toronto|vancouver/i, '🇨🇦'],
+    [/英国|united kingdom|\buk\b|london/i, '🇬🇧'], [/德国|germany|berlin|munich/i, '🇩🇪'], [/日本|japan|tokyo|osaka/i, '🇯🇵'], [/澳大利亚|australia|sydney|melbourne/i, '🇦🇺'], [/法国|france|paris/i, '🇫🇷'], [/墨西哥|mexico/i, '🇲🇽'], [/越南|vietnam/i, '🇻🇳'], [/菲律宾|philippines|manila/i, '🇵🇭'], [/印度|india/i, '🇮🇳'], [/新加坡|singapore/i, '🇸🇬']];
+  const flagOf = l => (FLAGS.find(([re]) => re.test(l)) || [, '🌐'])[1];
+  async function loadChart() {
+    ui.chartLoading = true; ui.chartError = '';
+    try { ui.chart = await ctx.api.get('/org/chart'); } catch (e) { ui.chartError = ctx.explainError(e); }
+    finally { ui.chartLoading = false; if (['orgchart', 'org'].includes(S().page)) ctx.rerender(); }
+  }
   function orgChart(items) {
-    const kids = new Map(); items.forEach(u => { const k = u.manager_id && items.some(x => x.id === u.manager_id) ? u.manager_id : '__root'; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(u); });
-    const node = u => `<li><div class="pp-org-node">${avatar(u, 36)}<strong>${esc(u.display_name)}</strong><span>${esc(u.title || (u.role === 'manager' ? tr('主管', 'Manager') : tr('员工', 'Employee')))}</span></div>${kids.get(u.id)?.length ? `<ul>${kids.get(u.id).map(node).join('')}</ul>` : ''}</li>`;
+    const ids = new Set(items.map(u => u.id));
+    const kids = new Map(); items.forEach(u => { const k = u.manager_id && ids.has(u.manager_id) ? u.manager_id : '__root'; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(u); });
+    const locs = [...new Set(items.map(locKey).filter(Boolean))];
+    const locColor = l => LOC_COLORS[locs.indexOf(l) % LOC_COLORS.length] || '#c4c4c4';
+    const size = id => (kids.get(id) || []).reduce((n, k) => n + 1 + size(k.id), 0);
+    const node = u => { const ch = kids.get(u.id) || [], collapsed = ui.chartCollapsed.has(u.id), l = locKey(u), dim = ui.chartLoc && l !== ui.chartLoc;
+      return `<li><div class="pp-oc-card ${u.id === me()?.id ? 'me' : ''} ${dim ? 'dim' : ''}" style="--lc:${locColor(l)}">${avatar(u, 44)}<div class="pp-oc-text"><strong>${esc(u.display_name)}</strong><span class="pp-oc-title">${esc(u.title || (u.role === 'manager' ? tr('主管', 'Manager') : tr('员工', 'Employee')))}</span><span class="pp-oc-loc"><span class="pp-flag" aria-hidden="true">${l ? flagOf(l) : '📍'}</span> ${esc(l || tr('未填写所在地', 'No location'))}</span></div>
+        ${ch.length ? `<button class="pp-oc-toggle" data-pp="chart-toggle" data-id="${esc(u.id)}" aria-expanded="${!collapsed}" title="${collapsed ? tr('展开下属', 'Show reports') : tr('收起下属', 'Hide reports')}">${collapsed ? `+${size(u.id)}` : icon('minus')}</button>` : ''}</div>${ch.length && !collapsed ? `<ul>${ch.map(node).join('')}</ul>` : ''}</li>`; };
     const roots = kids.get('__root') || [];
-    const unassigned = roots.filter(u => !kids.get(u.id)?.length), tops = roots.filter(u => kids.get(u.id)?.length);
-    return `<section class="pp-panel"><div class="pp-orgchart"><ul>${tops.map(node).join('')}</ul></div>${unassigned.length ? `<h3 class="pp-sub-h">${tr('尚未设置汇报线', 'No reporting line yet')}</h3><div class="pp-unassigned">${unassigned.map(u => `<span>${avatar(u, 24)} ${esc(u.display_name)}</span>`).join('')}</div>` : ''}</section>`;
+    const unassigned = roots.filter(u => !kids.get(u.id)?.length && roots.length > 1), tops = roots.filter(u => !unassigned.includes(u));
+    const legend = locs.length ? `<div class="pp-oc-legend">${icon('map-pin')} ${locs.map(l => `<button class="${ui.chartLoc === l ? 'on' : ''}" data-pp="chart-loc" data-v="${esc(l)}" style="--lc:${locColor(l)}"><i></i>${flagOf(l)} ${esc(l)} <b>${items.filter(u => locKey(u) === l).length}</b></button>`).join('')}</div>` : '';
+    return `<section class="pp-panel pp-oc-panel"><div class="pp-oc-bar">${legend}<span class="pp-oc-count">${tr(`共 ${items.length} 人`, `${items.length} people`)}</span><button class="pp-btn small" data-pp="chart-expand">${icon('arrows-out-simple')} ${tr('全部展开', 'Expand all')}</button></div>
+      <div class="pp-orgchart"><ul>${tops.map(node).join('')}</ul></div>${unassigned.length ? `<h3 class="pp-sub-h">${tr('尚未设置汇报线', 'No reporting line yet')}</h3><div class="pp-unassigned">${unassigned.map(u => `<span>${avatar(u, 24)} ${esc(u.display_name)} · ${esc(u.title || '')} · ${esc(locKey(u) || '—')}</span>`).join('')}</div>` : ''}</section>`;
+  }
+  function chartPage() {
+    const head = heading(tr('组织架构', 'Org chart'), tr('公司的汇报关系，以及每个人的岗位和所在地。点卡片右下角可以收起或展开下属，点所在地只突出显示该地的人。', 'Company reporting lines with each person’s role and location. Use the button on a card to collapse its reports; click a location to highlight it.'));
+    if (!caps()) return `<div class="pp">${head}<p class="pp-hint">${tr('需要后台升级后才能使用。', 'Requires the backend upgrade.')}</p></div>`;
+    if (!ui.chart && !ui.chartLoading && !ui.chartError) loadChart();
+    if (ui.chartError) return `<div class="pp">${head}<div class="pp-alert">${esc(ui.chartError)}</div></div>`;
+    if (!ui.chart) return `<div class="pp">${head}<p class="pp-hint">${tr('正在读取…', 'Loading…')}</p></div>`;
+    return `<div class="pp">${head}${orgChart(ui.chart.items)}${me()?.isAdmin ? `<p class="pp-hint">${icon('pencil-simple')} ${tr('要修改汇报线、岗位或所在地：管理员在“组织与权限”里修改汇报线和岗位，每个人在“个人设置”里填写所在地。', 'To change reporting lines or titles, admins use Organization & permissions; everyone sets their own location in Personal settings.')}</p>` : ''}</div>`;
   }
   async function patchMember(id, body) {
     try {
@@ -211,7 +240,7 @@
       ui.org.items = ui.org.items.map(u => u.id === id ? { ...u, ...row } : u);
       const dirUser = S().directory.find(u => u.id === id); if (dirUser) Object.assign(dirUser, { title:row.title, manager_id:row.manager_id, role:row.role });
       if (id === me().id) await ctx.refreshMe();
-      ui.team = null; ctx.toast(tr('已保存', 'Saved'));
+      ui.team = null; ui.chart = null; ctx.toast(tr('已保存', 'Saved'));
     } catch (e) { ctx.toast(ctx.explainError(e)); }
     ctx.rerender();
   }
@@ -225,14 +254,17 @@
     if (a === 'scope') { ui.teamScope = t.dataset.v; ui.team = null; return ctx.rerender(); }
     if (a === 'reload-team') { ui.team = null; return ctx.rerender(); }
     if (a === 'toggle-member') { ui.teamOpen.has(t.dataset.id) ? ui.teamOpen.delete(t.dataset.id) : ui.teamOpen.add(t.dataset.id); return ctx.rerender(); }
+    if (a === 'chart-toggle') { const id = t.dataset.id; ui.chartCollapsed.has(id) ? ui.chartCollapsed.delete(id) : ui.chartCollapsed.add(id); return ctx.rerender(); }
+    if (a === 'chart-expand') { ui.chartCollapsed.clear(); return ctx.rerender(); }
+    if (a === 'chart-loc') { ui.chartLoc = ui.chartLoc === t.dataset.v ? '' : t.dataset.v; return ctx.rerender(); }
     if (a === 'org-view') { ui.orgView = t.dataset.v; return ctx.rerender(); }
-    if (a === 'remove-avatar') { ctx.api.delete('/me/avatar').then(async () => { await ctx.refreshMe(); ctx.toast(tr('头像已移除', 'Photo removed')); ctx.rerender(); }).catch(err => ctx.toast(ctx.explainError(err))); }
+    if (a === 'remove-avatar') { ctx.api.delete('/me/avatar').then(async () => { await ctx.refreshMe(); ui.chart = null; ui.org = null; ctx.toast(tr('头像已移除', 'Photo removed')); ctx.rerender(); }).catch(err => ctx.toast(ctx.explainError(err))); }
   });
   document.addEventListener('change', async e => {
     if (!ctx) return;
     const el = e.target;
     if (el.matches('[data-pp-avatar]') && el.files?.[0]) {
-      try { const dataUrl = await resizeImage(el.files[0]); const r = await ctx.api.request('/me/avatar', { method:'PUT', body:{ dataUrl } }); await ctx.refreshMe(); const self = S().directory.find(u => u.id === me().id); if (self) self.avatar_version = r.avatarVersion; ctx.toast(tr('头像已更新', 'Photo updated')); ctx.rerender(); }
+      try { const dataUrl = await resizeImage(el.files[0]); const r = await ctx.api.request('/me/avatar', { method:'PUT', body:{ dataUrl } }); await ctx.refreshMe(); ui.chart = null; ui.org = null; const self = S().directory.find(u => u.id === me().id); if (self) self.avatar_version = r.avatarVersion; ctx.toast(tr('头像已更新', 'Photo updated')); ctx.rerender(); }
       catch (err) { ctx.toast(ctx.explainError(err)); }
       return;
     }
@@ -249,10 +281,10 @@
     const f = e.target; if (!ctx || f.id !== 'pp-profile') return;
     e.preventDefault();
     const v = Object.fromEntries(new FormData(f));
-    try { await ctx.api.request('/me/profile', { method:'PATCH', body:v }); await ctx.refreshMe(); const self = S().directory.find(u => u.id === me().id); if (self) Object.assign(self, v); ui.profileMsg = tr('已保存', 'Saved'); ctx.toast(tr('个人资料已保存', 'Profile saved')); }
+    try { await ctx.api.request('/me/profile', { method:'PATCH', body:v }); await ctx.refreshMe(); ui.chart = null; const self = S().directory.find(u => u.id === me().id); if (self) Object.assign(self, v); ui.profileMsg = tr('已保存', 'Saved'); ctx.toast(tr('个人资料已保存', 'Profile saved')); }
     catch (err) { ui.profileMsg = ctx.explainError(err); }
     ctx.rerender();
   });
 
-  window.WorkOSPeople = { configure(next) { ctx = next; }, avatar, workbench, team, settings, org, reset() { ui.team = null; ui.org = null; ui.teamOpen.clear(); }, _ui:ui };
+  window.WorkOSPeople = { configure(next) { ctx = next; }, avatar, workbench, team, settings, org, chart:chartPage, reset() { ui.team = null; ui.org = null; ui.chart = null; ui.teamOpen.clear(); }, _ui:ui };
 })();
