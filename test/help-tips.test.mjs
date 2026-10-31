@@ -48,9 +48,9 @@ test('every hint and page guide has complete Chinese and English text', () => {
 
 test('every sidebar page has a page guide', () => {
   const { help } = load(`<div id="app"></div>`);
-  const navBlock = liveSource.match(/const navs = \[(.*?)\];/)[1];
-  const navs = [...navBlock.matchAll(/\['([a-z]+)','[a-z]+','[^']+','[^']+'\]/g)].map(m => m[1]);
-  assert.ok(navs.length >= 9);
+  const navBlock = liveSource.match(/const navs = \[([\s\S]*?)\];/)[1];
+  const navs = [...navBlock.matchAll(/\['([a-z-]+)','[a-z]+','[^']+','[^']+','[a-z]+'\]/g)].map(m => m[1]);
+  assert.ok(navs.length >= 13);
   for (const id of navs) assert.ok(help.PAGES[id], `guide for ${id}`);
 });
 

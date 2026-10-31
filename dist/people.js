@@ -1,0 +1,258 @@
+'use strict';
+/* People & reports: personal workbench, team task analysis (follows reporting
+ * lines), personal settings (avatar, contact info) and organization &
+ * permissions (admins: reporting lines, titles, roles, admin, feature grants).
+ */
+(() => {
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  let ctx = null;
+  const ui = { team:null, teamLoading:false, teamError:'', teamScope:'reports', teamOpen:new Set(), org:null, orgLoading:false, orgError:'', orgView:'table', saving:false, profileMsg:'' };
+  const S = () => ctx.state();
+  const lang = () => ctx.lang() === 'en' ? 'en' : 'zh';
+  const tr = (zh, en) => lang() === 'en' ? en : zh;
+  const icon = n => `<i class="ph ph-${n}" aria-hidden="true"></i>`;
+  const caps = () => S().capabilities?.orgProfiles === true;
+  const me = () => S().actor;
+  const userById = id => S().directory.find(u => u.id === id) || (me()?.id === id ? me() : null) || ui.org?.items?.find(u => u.id === id);
+  const nameOf = id => userById(id)?.display_name || id || '—';
+  const hue = id => { let h = 0; for (const c of String(id || '')) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  const initials = n => { n = String(n || '?').trim(); return /^[\x00-\x7f]+$/.test(n) ? n.split(/\s+/).map(p => p[0]).join('').slice(0, 2).toUpperCase() : n.slice(-2); };
+  function avatar(user, size = 28) {
+    if (!user) return '';
+    const base = ctx?.apiBase || '/api';
+    if (user.avatar_version > 0 || user.avatarDataUrl) {
+      const src = user.avatarDataUrl || `${base}/users/${encodeURIComponent(user.id)}/avatar?v=${user.avatar_version}`;
+      return `<img class="pp-avatar" src="${esc(src)}" alt="" width="${size}" height="${size}" style="width:${size}px;height:${size}px">`;
+    }
+    return `<span class="pp-avatar pp-initials" style="--h:${hue(user.id)};width:${size}px;height:${size}px;font-size:${Math.round(size * .36)}px" aria-hidden="true">${esc(initials(user.display_name))}</span>`;
+  }
+  const fmtDate = v => { try { return new Intl.DateTimeFormat(lang() === 'en' ? 'en-US' : 'zh-CN', { month:'short', day:'numeric' }).format(new Date(v)); } catch { return v; } };
+  const heading = (title, desc, actions = '') => `<div class="page-heading"><div><div class="eyebrow">WORK OS</div><h1>${title}</h1><p>${desc}</p></div><div class="heading-actions">${actions}</div></div>`;
+  const stat = (label, value, note, tone = '') => `<div class="pp-stat ${tone}"><span>${label}</span><strong>${value}</strong><em>${note}</em></div>`;
+  const pctBar = (v, tone = '') => `<div class="pp-bar ${tone}"><span style="width:${v ?? 0}%"></span></div>`;
+
+  /* ---------------- personal workbench ---------------- */
+  function workbench() {
+    const a = me(), now = Date.now(), soon = now + 3 * 864e5;
+    const mine = S().tasks.filter(t => t.owner_id === a.id);
+    const open = mine.filter(t => t.status !== 'accepted');
+    const overdue = open.filter(t => new Date(t.due_at).getTime() < now);
+    const dueSoon = open.filter(t => { const d = new Date(t.due_at).getTime(); return d >= now && d < soon; });
+    const revision = mine.filter(t => t.status === 'revision');
+    const toReview = S().tasks.filter(t => t.reviewer_id === a.id && t.status === 'submitted');
+    const accepted = mine.filter(t => t.status === 'accepted');
+    const completion = mine.length ? Math.round(accepted.length / mine.length * 100) : null;
+    const okrHelpers = window.WorkOSOkrBoard?._helpers;
+    const myObjs = S().objectives.filter(o => o.owner_id === a.id);
+    const okrPct = okrHelpers && myObjs.length ? okrHelpers.averagePct ? okrHelpers.averagePct(myObjs) : null : null;
+    const pj = window.WorkOSProjects?._data;
+    const myProjects = pj ? pj.projects.filter(p => p.members.includes(a.id) || p.owner === a.id) : [];
+    const riskyProjects = myProjects.filter(p => p.health !== 'on_track');
+    const item = (t, tag, tone) => `<button class="pp-att-row" data-live-task="${esc(t.id)}"><span class="pp-att-tag ${tone}">${tag}</span><span class="pp-att-title">${esc(t.title)}</span><span class="pp-att-meta">${esc(nameOf(t.owner_id))} · ${fmtDate(t.due_at)}</span></button>`;
+    const rows = [
+      ...toReview.map(t => item(t, tr('待我验收', 'Review'), 'violet')),
+      ...overdue.map(t => item(t, tr('已逾期', 'Overdue'), 'red')),
+      ...revision.filter(t => !overdue.includes(t)).map(t => item(t, tr('被退回', 'Returned'), 'amber')),
+      ...dueSoon.map(t => item(t, tr('3 天内到期', 'Due soon'), 'blue')),
+    ];
+    const greet = (() => { const h = new Date().getHours(); return h < 12 ? tr('早上好', 'Good morning') : h < 18 ? tr('下午好', 'Good afternoon') : tr('晚上好', 'Good evening'); })();
+    return `<div class="pp">
+      ${heading(`${greet}，${esc(a.display_name)}`.replace('，', lang() === 'en' ? ', ' : '，'), tr('这里是你的个人表现和需要注意的事项。', 'Your personal performance and what needs your attention.'), `<button class="btn primary" data-live-action="new-task">${icon('plus')} ${tr('新建任务', 'New task')}</button>`)}
+      <div class="pp-stats">
+        ${stat(tr('进行中的任务', 'Open tasks'), open.length, tr('分派给我的', 'Assigned to me'))}
+        ${stat(tr('已逾期', 'Overdue'), overdue.length, tr('需要尽快处理', 'Needs action'), overdue.length ? 'bad' : '')}
+        ${stat(tr('待我验收', 'Awaiting my review'), toReview.length, tr('同事已提交成果', 'Submitted by colleagues'), toReview.length ? 'warn' : '')}
+        ${stat(tr('任务完成度', 'Completion'), completion === null ? '—' : completion + '%', `${accepted.length}/${mine.length} ${tr('已验收', 'accepted')}`)}
+        ${stat(tr('OKR 进度', 'OKR progress'), okrPct === null || okrPct === undefined ? '—' : okrPct + '%', `${myObjs.length} ${tr('个目标', 'objectives')}`)}
+      </div>
+      <div class="pp-grid">
+        <section class="pp-panel"><div class="pp-panel-head"><h2>${icon('bell-ringing')} ${tr('需要注意', 'Needs attention')}</h2><span class="pp-count">${rows.length}</span></div>
+          ${rows.join('') || `<div class="pp-empty">${icon('check-circle')}<p>${tr('没有需要处理的事项，保持得很好。', 'Nothing needs your attention. Nice work.')}</p></div>`}
+        </section>
+        <div class="pp-side">
+          <section class="pp-panel"><div class="pp-panel-head"><h2>${icon('target')} ${tr('我的 OKR', 'My OKRs')}</h2><button class="btn small" data-live-page="okr">${tr('查看', 'Open')}</button></div>
+            ${myObjs.slice(0, 4).map(o => { const v = okrHelpers?.objectivePct ? okrHelpers.objectivePct(o) : null; return `<div class="pp-mini"><span>${esc(o.title)}</span><div class="pp-mini-bar">${pctBar(v)}<b>${v === null ? '—' : v + '%'}</b></div></div>`; }).join('') || `<p class="pp-hint">${tr('还没有目标。', 'No objectives yet.')}</p>`}
+          </section>
+          <section class="pp-panel"><div class="pp-panel-head"><h2>${icon('folder')} ${tr('我参与的项目', 'My projects')}</h2><button class="btn small" data-live-page="projects">${tr('查看', 'Open')}</button></div>
+            ${myProjects.slice(0, 4).map(p => { const ts = pj.tasks.filter(t => t.project === p.id), v = ts.length ? Math.round(ts.filter(t => t.status === 'done').length / ts.length * 100) : 0; const h = { on_track:['正常','On track','ok'], at_risk:['有风险','At risk','warn'], off_track:['延期','Off track','bad'] }[p.health]; return `<div class="pp-mini"><span>${esc(p.name[lang()] || p.name.zh)} <em class="pp-health ${h[2]}">${tr(h[0], h[1])}</em></span><div class="pp-mini-bar">${pctBar(v)}<b>${v}%</b></div></div>`; }).join('') || `<p class="pp-hint">${tr('还没有参与项目。', 'No projects yet.')}</p>`}
+            ${riskyProjects.length ? `<p class="pp-warn">${icon('warning')} ${tr(`${riskyProjects.length} 个项目有风险或延期`, `${riskyProjects.length} project(s) at risk or late`)}</p>` : ''}
+          </section>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ---------------- team analysis ---------------- */
+  async function loadTeam() {
+    if (!caps()) return;
+    ui.teamLoading = true; ui.teamError = '';
+    try { ui.team = await ctx.api.get('/reports/team' + (ui.teamScope === 'all' ? '?scope=all' : '')); }
+    catch (e) { ui.teamError = ctx.explainError(e); }
+    finally { ui.teamLoading = false; if (S().page === 'team') ctx.rerender(); }
+  }
+  function team() {
+    if (!caps()) return `<div class="pp">${heading(tr('团队任务分析', 'Team analysis'), tr('需要后台升级（汇报线功能）后才能使用。', 'Requires the backend upgrade with reporting lines.'))}</div>`;
+    if (!ui.team && !ui.teamLoading && !ui.teamError) { loadTeam(); }
+    const d = ui.team, t = d?.totals;
+    const scopeSwitch = d?.canViewAll ? `<div class="pp-seg"><button class="${ui.teamScope === 'reports' ? 'active' : ''}" data-pp="scope" data-v="reports">${tr('我的下属', 'My reports')}</button><button class="${ui.teamScope === 'all' ? 'active' : ''}" data-pp="scope" data-v="all">${tr('全公司', 'Whole company')}</button></div>` : '';
+    const head = heading(tr('团队任务分析', 'Team analysis'), tr('按汇报线汇总：所有直接和间接向你汇报的同事的任务完成情况。', 'Task outcomes for everyone who reports to you, directly or indirectly.'), `${scopeSwitch}<button class="btn" data-pp="reload-team">${icon('arrows-clockwise')} ${tr('刷新', 'Refresh')}</button>`);
+    if (ui.teamLoading && !d) return `<div class="pp">${head}<p class="pp-hint">${tr('正在读取…', 'Loading…')}</p></div>`;
+    if (ui.teamError) return `<div class="pp">${head}<div class="pp-alert">${esc(ui.teamError)}</div></div>`;
+    if (!d.members.length) return `<div class="pp">${head}<div class="pp-empty big">${icon('tree-structure')}<h3>${tr('还没有人向你汇报', 'No one reports to you yet')}</h3><p>${tr('汇报线由管理员在“组织与权限”里设置。设置后，这里会显示团队成员的任务完成度、准时率和逾期情况。', 'Reporting lines are set by an administrator in Organization & permissions. Then this page shows completion, on-time rate and overdue work for your team.')}</p>${me().isAdmin ? `<button class="btn primary" data-live-page="org">${tr('去设置汇报线', 'Set reporting lines')}</button>` : ''}</div></div>`;
+    const sorted = [...d.members].sort((a, b) => (b.stats.overdue - a.stats.overdue) || ((a.stats.completionRate ?? 101) - (b.stats.completionRate ?? 101)));
+    return `<div class="pp">${head}
+      <div class="pp-stats">
+        ${stat(tr('团队人数', 'People'), d.members.length, d.scope === 'all' ? tr('全公司', 'Whole company') : tr('直接 + 间接下属', 'Direct + indirect'))}
+        ${stat(tr('任务完成度', 'Completion'), t.completionRate === null ? '—' : t.completionRate + '%', `${t.accepted}/${t.total} ${tr('已验收', 'accepted')}`)}
+        ${stat(tr('准时完成率', 'On-time rate'), t.onTimeRate === null ? '—' : t.onTimeRate + '%', tr('验收时间不晚于截止日', 'Accepted by the due date'))}
+        ${stat(tr('平均质量分', 'Avg quality'), t.avgQuality ?? '—', tr('验收人打分', 'Reviewer score'))}
+        ${stat(tr('逾期未完成', 'Overdue'), t.overdue, `${t.dueSoon} ${tr('项 7 天内到期', 'due within 7 days')}`, t.overdue ? 'bad' : '')}
+      </div>
+      <section class="pp-panel pp-table-panel"><table class="pp-table"><thead><tr><th>${tr('成员', 'Member')}</th><th>${tr('任务', 'Tasks')}</th><th>${tr('完成度', 'Completion')}</th><th>${tr('准时率', 'On time')}</th><th>${tr('质量', 'Quality')}</th><th>${tr('待验收', 'In review')}</th><th>${tr('逾期', 'Overdue')}</th><th></th></tr></thead><tbody>
+        ${sorted.map(m => { const s = m.stats, open = ui.teamOpen.has(m.id); return `<tr class="${s.overdue ? 'pp-row-bad' : ''}"><td><div class="pp-person">${avatar(m, 30)}<div><strong>${esc(m.display_name)}</strong><span>${esc(m.title || '')}${m.depth > 1 ? ` · ${tr('间接下属', 'indirect')}` : ''}${m.manager_id ? ` · ${tr('上级', 'reports to')} ${esc(nameOf(m.manager_id))}` : ''}</span></div></div></td><td>${s.total}<small> / ${s.open} ${tr('进行中', 'open')}</small></td><td><div class="pp-cell-bar">${pctBar(s.completionRate, s.completionRate !== null && s.completionRate < 50 ? 'warn' : '')}<b>${s.completionRate ?? '—'}${s.completionRate === null ? '' : '%'}</b></div></td><td>${s.onTimeRate === null ? '—' : s.onTimeRate + '%'}</td><td>${s.avgQuality ?? '—'}</td><td>${s.waiting}</td><td class="${s.overdue ? 'pp-bad' : ''}">${s.overdue}</td><td>${m.attention.length ? `<button class="btn small" data-pp="toggle-member" data-id="${esc(m.id)}">${open ? tr('收起', 'Hide') : tr('查看问题', 'Details')} (${m.attention.length})</button>` : ''}</td></tr>${open ? `<tr class="pp-sub"><td colspan="8">${m.attention.map(a => `<button class="pp-att-row" data-live-task="${esc(a.id)}"><span class="pp-att-tag ${a.overdue ? 'red' : 'amber'}">${a.overdue ? tr('已逾期', 'Overdue') : tr('被退回', 'Returned')}</span><span class="pp-att-title">${esc(a.title)}</span><span class="pp-att-meta">${fmtDate(a.dueAt)}</span></button>`).join('')}</td></tr>` : ''}`; }).join('')}
+      </tbody></table></section>
+      <p class="pp-hint">${icon('info')} ${tr('指标只统计系统里有记录的任务；完成度 = 已验收 / 全部任务，准时率按验收时间与截止日比较。数据用于发现需要帮助的地方，不自动形成人事结论。', 'Metrics cover tasks recorded in this system. Completion = accepted / all tasks; on-time compares acceptance with the due date. Use them to spot where help is needed, not as automated HR decisions.')}</p>
+    </div>`;
+  }
+
+  /* ---------------- personal settings ---------------- */
+  const ZONES = ['America/Los_Angeles', 'America/Denver', 'America/Chicago', 'America/New_York', 'Asia/Shanghai', 'Asia/Hong_Kong', 'Asia/Tokyo', 'Europe/London', 'Europe/Berlin', 'Australia/Sydney'];
+  function settings() {
+    const a = me(), manager = a.manager_id ? userById(a.manager_id) : null;
+    const reports = S().directory.filter(u => u.manager_id === a.id);
+    const browserZone = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return ''; } })();
+    const zones = [...new Set([a.timezone, browserZone, ...ZONES].filter(Boolean))];
+    const field = (name, label, value, type = 'text', extra = '') => `<label class="field"><span>${label}</span><input name="${name}" type="${type}" value="${esc(value || '')}" ${extra}></label>`;
+    const grants = a.grants || [];
+    const yes = v => v ? `<span class="pp-yes">${icon('check-circle')} ${tr('有', 'Yes')}</span>` : `<span class="pp-no">${tr('无', 'No')}</span>`;
+    return `<div class="pp">${heading(tr('个人设置', 'Personal settings'), tr('你的头像和联系方式会显示给同事，方便大家找到你。', 'Your photo and contact details are shown to colleagues so they can reach you.'))}
+      ${caps() ? '' : `<div class="pp-alert">${tr('需要后台升级后才能保存个人资料。', 'Saving your profile requires the backend upgrade.')}</div>`}
+      <div class="pp-settings">
+        <section class="pp-panel pp-profile-card">
+          <div class="pp-avatar-edit">${avatar(a, 96)}<div><h2>${esc(a.display_name)}</h2><p>${esc(a.title || tr('未设置职位', 'No title yet'))}</p>
+            <label class="btn small pp-upload">${icon('camera')} ${tr('上传头像', 'Upload photo')}<input type="file" accept="image/png,image/jpeg,image/webp" data-pp-avatar hidden ${caps() ? '' : 'disabled'}></label>${a.avatar_version > 0 ? `<button class="btn small" data-pp="remove-avatar">${tr('移除', 'Remove')}</button>` : ''}
+            <p class="pp-hint">${tr('支持 JPG / PNG / WebP，会自动裁成正方形并压缩。', 'JPG / PNG / WebP; cropped to a square and compressed automatically.')}</p></div></div>
+          <dl class="pp-facts"><dt>${tr('姓名', 'Name')}</dt><dd>${esc(a.display_name)} <small>${tr('（来自钉钉）', '(from DingTalk)')}</small></dd>
+            <dt>${tr('直属上级', 'Manager')}</dt><dd>${manager ? `${avatar(manager, 22)} ${esc(manager.display_name)}` : tr('未设置', 'Not set')}</dd>
+            <dt>${tr('直接下属', 'Direct reports')}</dt><dd>${reports.length ? reports.map(r => `${avatar(r, 22)} ${esc(r.display_name)}`).join('　') : '—'}</dd></dl>
+        </section>
+        <section class="pp-panel"><h2>${tr('联系方式', 'Contact details')}</h2>
+          <form id="pp-profile" class="form-grid">
+            ${field('title', tr('职位', 'Title'), a.title, 'text', 'maxlength="80" placeholder="' + tr('例如：销售经理', 'e.g. Sales manager') + '"')}
+            ${field('phone', tr('电话', 'Phone'), a.phone, 'tel', 'maxlength="40" placeholder="+1 949 555 0100"')}
+            ${field('email', tr('邮箱', 'Email'), a.email, 'email', 'maxlength="200"')}
+            ${field('wechat', tr('微信', 'WeChat'), a.wechat, 'text', 'maxlength="60"')}
+            ${field('location', tr('所在地', 'Location'), a.location, 'text', 'maxlength="80" placeholder="' + tr('例如：Irvine, CA / 武汉', 'e.g. Irvine, CA') + '"')}
+            <label class="field"><span>${tr('时区', 'Time zone')}</span><select name="timezone"><option value="">${tr('未设置', 'Not set')}</option>${zones.map(z => `<option value="${esc(z)}" ${z === a.timezone ? 'selected' : ''}>${esc(z)}</option>`).join('')}</select></label>
+            <div class="pp-form-actions full"><span class="pp-hint" role="status">${esc(ui.profileMsg)}</span><button class="btn primary" type="submit" ${caps() ? '' : 'disabled'}>${tr('保存', 'Save')}</button></div>
+          </form>
+        </section>
+        <section class="pp-panel"><h2>${tr('我的权限', 'My access')}</h2>
+          <dl class="pp-facts"><dt>${tr('角色', 'Role')}</dt><dd>${a.role === 'manager' ? tr('主管（可管理本部门任务和目标）', 'Manager (manages department tasks and goals)') : tr('员工', 'Employee')}</dd>
+            <dt>${tr('管理员', 'Administrator')}</dt><dd>${yes(a.isAdmin)}</dd>
+            <dt>${tr('老板看板', 'Executive overview')}</dt><dd>${yes(a.executiveAccess)}</dd>
+            <dt>${tr('客服工作台', 'Support workspace')}</dt><dd>${yes(a.supportAccess?.read)}</dd>
+            <dt>${tr('产品管理区', 'Product hub')}</dt><dd>${yes(grants.includes('products'))}</dd>
+            <dt>${tr('成本计算明细', 'Cost breakdown')}</dt><dd>${yes(grants.includes('product_cost_detail'))}</dd></dl>
+          <p class="pp-hint">${tr('权限由管理员在“组织与权限”中设置。', 'Access is set by an administrator in Organization & permissions.')}</p>
+        </section>
+      </div></div>`;
+  }
+  function resizeImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image(), url = URL.createObjectURL(file);
+      img.onload = () => { const size = 256, c = document.createElement('canvas'); c.width = size; c.height = size; const s = Math.min(img.width, img.height); c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size); URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg', .86)); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(tr('无法读取这张图片', 'This image could not be read'))); };
+      img.src = url;
+    });
+  }
+
+  /* ---------------- organization & permissions ---------------- */
+  async function loadOrg() {
+    ui.orgLoading = true; ui.orgError = '';
+    try { ui.org = await ctx.api.get('/org/members'); } catch (e) { ui.orgError = ctx.explainError(e); }
+    finally { ui.orgLoading = false; if (S().page === 'org') ctx.rerender(); }
+  }
+  function org() {
+    if (!caps()) return `<div class="pp">${heading(tr('组织与权限', 'Organization & permissions'), tr('需要后台升级后才能使用。', 'Requires the backend upgrade.'))}</div>`;
+    if (!ui.org && !ui.orgLoading && !ui.orgError) loadOrg();
+    const head = heading(tr('组织与权限', 'Organization & permissions'), tr('设置每个人的直属上级、职位、角色和功能权限。汇报线决定谁能在“团队任务分析”里看到谁。', 'Set each person’s manager, title, role and feature access. Reporting lines decide who sees whom in Team analysis.'),
+      `<div class="pp-seg"><button class="${ui.orgView === 'table' ? 'active' : ''}" data-pp="org-view" data-v="table">${icon('table')} ${tr('成员与权限', 'Members & access')}</button><button class="${ui.orgView === 'chart' ? 'active' : ''}" data-pp="org-view" data-v="chart">${icon('tree-structure')} ${tr('汇报线图', 'Org chart')}</button></div>`);
+    if (ui.orgError) return `<div class="pp">${head}<div class="pp-alert">${esc(ui.orgError)}</div></div>`;
+    if (!ui.org) return `<div class="pp">${head}<p class="pp-hint">${tr('正在读取…', 'Loading…')}</p></div>`;
+    const items = ui.org.items.filter(u => u.active !== false);
+    if (ui.orgView === 'chart') return `<div class="pp">${head}${orgChart(items)}</div>`;
+    const opt = (v, label, cur) => `<option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(label)}</option>`;
+    const check = (u, grant, disabled = false) => `<label class="pp-switch"><input type="checkbox" data-pp-grant="${grant}" data-id="${esc(u.id)}" ${(u.grants || []).includes(grant) ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span></span></label>`;
+    return `<div class="pp">${head}
+      <section class="pp-panel pp-table-panel"><table class="pp-table pp-org"><thead><tr><th>${tr('成员', 'Member')}</th><th>${tr('职位', 'Title')}</th><th>${tr('直属上级', 'Manager')}</th><th>${tr('角色', 'Role')}</th><th>${tr('管理员', 'Admin')}</th><th>${tr('产品管理区', 'Product hub')}</th><th>${tr('成本明细', 'Cost detail')}</th><th>${tr('老板看板', 'Executive')}</th></tr></thead><tbody>
+      ${items.map(u => `<tr><td><div class="pp-person">${avatar(u, 30)}<div><strong>${esc(u.display_name)}</strong><span>${esc(u.email || u.phone || '')}</span></div></div></td>
+        <td><input class="pp-inline" data-pp-field="title" data-id="${esc(u.id)}" value="${esc(u.title || '')}" maxlength="80" placeholder="${tr('职位', 'Title')}"></td>
+        <td><select class="pp-inline" data-pp-field="managerId" data-id="${esc(u.id)}">${opt('', tr('无（最高层）', 'None (top)'), u.manager_id || '')}${items.filter(x => x.id !== u.id).map(x => opt(x.id, x.display_name, u.manager_id)).join('')}</select></td>
+        <td><select class="pp-inline" data-pp-field="role" data-id="${esc(u.id)}">${opt('employee', tr('员工', 'Employee'), u.role)}${opt('manager', tr('主管', 'Manager'), u.role)}</select></td>
+        <td>${u.adminSource === 'deployment' ? `<span class="pp-lock" title="${tr('由部署配置指定，不能在这里取消', 'Set in deployment config')}">${icon('lock-simple')} ${tr('系统', 'System')}</span>` : `<label class="pp-switch"><input type="checkbox" data-pp-admin data-id="${esc(u.id)}" ${u.admin ? 'checked' : ''}><span></span></label>`}</td>
+        <td>${check(u, 'products')}</td><td>${check(u, 'product_cost_detail', !(u.grants || []).includes('products'))}</td>
+        <td>${u.executive ? `<span class="pp-lock">${icon('lock-simple')} ${tr('有', 'Yes')}</span>` : '—'}</td></tr>`).join('')}
+      </tbody></table></section>
+      <div class="pp-notes"><p>${icon('info')} ${tr('修改后立即保存并记录审计日志。“角色”设为主管后，可以管理本部门的任务和目标；钉钉重新登录不会覆盖这里的设置。', 'Changes save immediately and are audited. Managers can manage department tasks and goals; DingTalk re-login keeps these settings.')}</p>
+      <p>${icon('lock-simple')} ${tr('“产品管理区”只给需要的人开通；“成本明细”可以看到价格的计算过程，开通前请确认。老板看板和客服工作台目前由部署配置管理。', 'Grant Product hub only to those who need it; Cost detail reveals how prices are calculated. Executive and Support access are currently managed in deployment config.')}</p></div>
+    </div>`;
+  }
+  function orgChart(items) {
+    const kids = new Map(); items.forEach(u => { const k = u.manager_id && items.some(x => x.id === u.manager_id) ? u.manager_id : '__root'; if (!kids.has(k)) kids.set(k, []); kids.get(k).push(u); });
+    const node = u => `<li><div class="pp-org-node">${avatar(u, 36)}<strong>${esc(u.display_name)}</strong><span>${esc(u.title || (u.role === 'manager' ? tr('主管', 'Manager') : tr('员工', 'Employee')))}</span></div>${kids.get(u.id)?.length ? `<ul>${kids.get(u.id).map(node).join('')}</ul>` : ''}</li>`;
+    const roots = kids.get('__root') || [];
+    const unassigned = roots.filter(u => !kids.get(u.id)?.length), tops = roots.filter(u => kids.get(u.id)?.length);
+    return `<section class="pp-panel"><div class="pp-orgchart"><ul>${tops.map(node).join('')}</ul></div>${unassigned.length ? `<h3 class="pp-sub-h">${tr('尚未设置汇报线', 'No reporting line yet')}</h3><div class="pp-unassigned">${unassigned.map(u => `<span>${avatar(u, 24)} ${esc(u.display_name)}</span>`).join('')}</div>` : ''}</section>`;
+  }
+  async function patchMember(id, body) {
+    try {
+      const row = await ctx.api.request('/org/members/' + encodeURIComponent(id), { method:'PATCH', body });
+      ui.org.items = ui.org.items.map(u => u.id === id ? { ...u, ...row } : u);
+      const dirUser = S().directory.find(u => u.id === id); if (dirUser) Object.assign(dirUser, { title:row.title, manager_id:row.manager_id, role:row.role });
+      if (id === me().id) await ctx.refreshMe();
+      ui.team = null; ctx.toast(tr('已保存', 'Saved'));
+    } catch (e) { ctx.toast(ctx.explainError(e)); }
+    ctx.rerender();
+  }
+
+  /* ---------------- events ---------------- */
+  document.addEventListener('click', e => {
+    if (!ctx) return;
+    const t = e.target.closest('[data-pp]'); if (!t) return;
+    e.preventDefault();
+    const a = t.dataset.pp;
+    if (a === 'scope') { ui.teamScope = t.dataset.v; ui.team = null; return ctx.rerender(); }
+    if (a === 'reload-team') { ui.team = null; return ctx.rerender(); }
+    if (a === 'toggle-member') { ui.teamOpen.has(t.dataset.id) ? ui.teamOpen.delete(t.dataset.id) : ui.teamOpen.add(t.dataset.id); return ctx.rerender(); }
+    if (a === 'org-view') { ui.orgView = t.dataset.v; return ctx.rerender(); }
+    if (a === 'remove-avatar') { ctx.api.delete('/me/avatar').then(async () => { await ctx.refreshMe(); ctx.toast(tr('头像已移除', 'Photo removed')); ctx.rerender(); }).catch(err => ctx.toast(ctx.explainError(err))); }
+  });
+  document.addEventListener('change', async e => {
+    if (!ctx) return;
+    const el = e.target;
+    if (el.matches('[data-pp-avatar]') && el.files?.[0]) {
+      try { const dataUrl = await resizeImage(el.files[0]); const r = await ctx.api.request('/me/avatar', { method:'PUT', body:{ dataUrl } }); await ctx.refreshMe(); const self = S().directory.find(u => u.id === me().id); if (self) self.avatar_version = r.avatarVersion; ctx.toast(tr('头像已更新', 'Photo updated')); ctx.rerender(); }
+      catch (err) { ctx.toast(ctx.explainError(err)); }
+      return;
+    }
+    if (el.matches('[data-pp-field]')) { const v = el.value.trim(), f = el.dataset.ppField; return patchMember(el.dataset.id, { [f]:f === 'managerId' ? (v || null) : v }); }
+    if (el.matches('[data-pp-admin]')) return patchMember(el.dataset.id, { isAdmin:el.checked });
+    if (el.matches('[data-pp-grant]')) {
+      const u = ui.org.items.find(x => x.id === el.dataset.id), g = new Set(u.grants || []);
+      el.checked ? g.add(el.dataset.ppGrant) : g.delete(el.dataset.ppGrant);
+      if (!g.has('products')) g.delete('product_cost_detail');
+      return patchMember(u.id, { grants:[...g] });
+    }
+  });
+  document.addEventListener('submit', async e => {
+    const f = e.target; if (!ctx || f.id !== 'pp-profile') return;
+    e.preventDefault();
+    const v = Object.fromEntries(new FormData(f));
+    try { await ctx.api.request('/me/profile', { method:'PATCH', body:v }); await ctx.refreshMe(); const self = S().directory.find(u => u.id === me().id); if (self) Object.assign(self, v); ui.profileMsg = tr('已保存', 'Saved'); ctx.toast(tr('个人资料已保存', 'Profile saved')); }
+    catch (err) { ui.profileMsg = ctx.explainError(err); }
+    ctx.rerender();
+  });
+
+  window.WorkOSPeople = { configure(next) { ctx = next; }, avatar, workbench, team, settings, org, reset() { ui.team = null; ui.org = null; ui.teamOpen.clear(); }, _ui:ui };
+})();

@@ -251,6 +251,45 @@
     ctx.modal(tr('新建项目', 'New project'), `<form id="pj-new"><label class="field full"><span>${tr('项目名称', 'Project name')}</span><input name="name" required placeholder="${tr('例如：Cobra 2.0 新品开发', 'e.g. Cobra 2.0 launch')}"></label><p class="fine">${tr('选择模板', 'Choose a template')}</p><div class="pj-tpls">${tpl.map(([id, ic, n, s], i) => `<label class="pj-tpl"><input type="radio" name="tpl" value="${id}" ${i === 1 ? 'checked' : ''}><span>${icon(ic)}<strong>${n}</strong><em>${s}</em></span></label>`).join('')}</div><div class="form-grid"><label class="field"><span>${tr('开始日期', 'Start')}</span><input name="start" type="date" value="2026-11-02"></label><label class="field"><span>${tr('结束日期', 'End')}</span><input name="end" type="date" value="2026-12-31"></label></div><p class="fine">${tr('成员可以来自不同部门；项目成员能看到整个项目，看不到项目以外的内容。', 'Members can come from any department; they see the whole project and nothing outside it.')}</p></form>`, `<button class="btn primary" type="submit" form="pj-new">${tr('创建项目', 'Create project')}</button>`);
   }
 
+
+  /* ---------- project analysis (reports area) ---------- */
+  function analysis() {
+    const rows = projects.map(p => {
+      const ts = tasksOf(p), done = ts.filter(t => t.status === 'done').length, total = ts.length || 1;
+      const elapsed = Math.max(0, Math.min(1, days(p.start, TODAY) / Math.max(1, days(p.start, p.end))));
+      const progress = done / total, gap = Math.round((progress - elapsed) * 100);
+      const od = ts.filter(overdue), stuck = ts.filter(t => t.status === 'stuck');
+      const remaining = ts.filter(t => t.status !== 'done').length;
+      // Simple, explainable delay estimate: share of time used vs work done, plus overdue and blocked tasks.
+      const risk = Math.max(0, Math.min(100, Math.round((elapsed - progress) * 120 + od.length * 12 + stuck.length * 15 + (p.health === 'off_track' ? 20 : p.health === 'at_risk' ? 10 : 0))));
+      const nextMs = p.milestones.filter(m => !m.done).sort((a, b) => a.date.localeCompare(b.date))[0];
+      return { p, ts, done, progress:Math.round(progress * 100), elapsed:Math.round(elapsed * 100), gap, od, stuck, remaining, risk, nextMs };
+    }).sort((a, b) => b.risk - a.risk);
+    const lvl = r => r >= 60 ? ['高', 'High', 'bad'] : r >= 30 ? ['中', 'Medium', 'warn'] : ['低', 'Low', 'ok'];
+    const totalTasks = rows.reduce((s, r) => s + r.ts.length, 0), totalDone = rows.reduce((s, r) => s + r.done, 0), totalOd = rows.reduce((s, r) => s + r.od.length, 0);
+    return `<div class="pj">
+      <div class="page-heading"><div><div class="eyebrow">WORK OS · REPORTS</div><h1>${tr('项目分析', 'Project analysis')}</h1><p>${tr('每个项目的进展、是否按时，以及延期的可能性。', 'Progress, timeliness and delay risk for every project.')}</p></div></div>
+      <div class="pj-proto">${icon('flask')} ${tr('使用项目管理原型数据；项目管理接入后台后自动换成真实数据', 'Uses project prototype data; switches to real data once projects are connected')}</div>
+      <div class="pj-an-stats">
+        <div><span>${tr('进行中的项目', 'Active projects')}</span><strong>${rows.length}</strong></div>
+        <div><span>${tr('任务完成', 'Tasks done')}</span><strong>${totalDone}/${totalTasks}</strong></div>
+        <div class="${totalOd ? 'bad' : ''}"><span>${tr('逾期任务', 'Overdue tasks')}</span><strong>${totalOd}</strong></div>
+        <div class="${rows.filter(r => r.risk >= 60).length ? 'bad' : ''}"><span>${tr('高延期风险', 'High delay risk')}</span><strong>${rows.filter(r => r.risk >= 60).length}</strong></div>
+      </div>
+      <section class="pj-panel"><table class="pj-an-table"><thead><tr><th>${tr('项目', 'Project')}</th><th>${tr('状态', 'Status')}</th><th>${tr('工作进度 vs 时间进度', 'Work vs time elapsed')}</th><th>${tr('偏差', 'Gap')}</th><th>${tr('逾期 / 卡住', 'Overdue / stuck')}</th><th>${tr('下一个里程碑', 'Next milestone')}</th><th>${tr('延期可能性', 'Delay risk')}</th></tr></thead><tbody>
+        ${rows.map(r => { const l = lvl(r.risk); return `<tr><td><button class="pj-tlink pj-an-name" data-pj="open-project" data-id="${r.p.id}" data-goto="projects"><span class="pj-picon small" style="--pc:${r.p.color}">${icon(r.p.emoji)}</span><span><strong>${esc(L(r.p.name))}</strong><em>${esc(person(r.p.owner).name)} · ${fmt(r.p.start)} – ${fmt(r.p.end)}</em></span></button></td>
+          <td>${healthDot(r.p.health)}</td>
+          <td><div class="pj-an-bars"><div title="${tr('工作完成', 'Work done')}"><i style="width:${r.progress}%;--c:#00c875"></i></div><div title="${tr('时间已过', 'Time elapsed')}"><i style="width:${r.elapsed}%;--c:#9699a6"></i></div></div><small>${tr('完成', 'Done')} ${r.progress}% · ${tr('时间', 'Time')} ${r.elapsed}%</small></td>
+          <td class="${r.gap < -10 ? 'pj-late' : ''}">${r.gap > 0 ? '+' : ''}${r.gap}%</td>
+          <td>${r.od.length ? `<span class="pj-late">${r.od.length}</span>` : 0} / ${r.stuck.length ? `<span class="pj-late">${r.stuck.length}</span>` : 0}</td>
+          <td>${r.nextMs ? `${esc(L(r.nextMs.name))}<br><small class="${r.nextMs.date < TODAY ? 'pj-late' : ''}">${fmt(r.nextMs.date)}</small>` : '—'}</td>
+          <td><div class="pj-risk ${l[2]}"><b>${r.risk}</b><span>${tr(l[0], l[1])}</span></div></td></tr>`; }).join('')}
+      </tbody></table></section>
+      <section class="pj-panel"><h3>${tr('需要关注', 'Needs attention')}</h3><ul class="pj-an-list">${rows.flatMap(r => [...r.od.map(t => ({ t, r, why:tr('逾期', 'Overdue') })), ...r.stuck.filter(t => !overdue(t)).map(t => ({ t, r, why:tr('卡住', 'Stuck') }))]).map(({ t, r, why }) => `<li><span class="pj-pill small" style="--c:#e2445c">${why}</span><button class="pj-tlink" data-pj="open-task" data-id="${t.id}">${esc(L(t.title))}</button><span class="pj-tag" style="--c:${r.p.color}">${esc(L(r.p.name))}</span>${av(t.owner, 22)}<span class="pj-due late">${fmt(t.due)}</span></li>`).join('') || `<li class="pj-empty-line">${tr('没有逾期或卡住的任务', 'No overdue or stuck tasks')}</li>`}</ul></section>
+      <p class="pj-hint">${icon('info')} ${tr('延期可能性 = 时间已过却未完成的比例 + 逾期任务 + 卡住任务 + 负责人标记的状态，0–100 分；60 分以上需要立即处理。这是一个透明的经验公式，便于讨论，而不是精确预测。', 'Delay risk (0–100) combines time used vs work done, overdue and stuck tasks, and the owner’s status; 60+ needs action now. It is a transparent rule of thumb for discussion, not a precise forecast.')}</p>
+    </div>`;
+  }
+
   /* ---------- render & events ---------- */
   function render() { if (!ctx) return ''; const p = ui.project && proj(ui.project); return p ? projectPage(p) : home(); }
   const rerender = () => { ctx.rerender(); requestAnimationFrame(() => document.querySelector('[data-pj-focus]')?.focus()); };
@@ -266,7 +305,7 @@
       case 'go-home': ui.project = null; ui.view = 'home'; return rerender();
       case 'go-my': ui.project = null; ui.view = 'my'; return rerender();
       case 'filter': ui.filter = t.dataset.v; return rerender();
-      case 'open-project': ui.project = id; ui.tab = 'list'; return rerender();
+      case 'open-project': ui.project = id; ui.tab = 'list'; if (t.dataset.goto && ctx.state().page !== 'projects') { window.location.hash = 'projects'; return; } return rerender();
       case 'tab': ui.tab = t.dataset.v; ui.adding = null; return rerender();
       case 'open-task': return openTask(id);
       case 'cell': ui.cell = ui.cell && ui.cell.id === id && ui.cell.f === t.dataset.f ? null : { id, f:t.dataset.f }; return rerender();
@@ -291,5 +330,5 @@
       ctx.closeOverlay(); ui.project = id; ui.tab = 'list'; ctx.toast(tr('项目已创建，按阶段添加任务吧', 'Project created — add tasks by stage')); return rerender(); }
   });
 
-  window.WorkOSProjects = { configure(next) { ctx = next; }, render, _data:{ projects, tasks }, _ui:ui };
+  window.WorkOSProjects = { configure(next) { ctx = next; }, render, analysis, _data:{ projects, tasks }, _ui:ui };
 })();
